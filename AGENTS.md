@@ -17,7 +17,13 @@ This is a task management web application that displays and manages tasks from `
 
 2. **Backend** (Node.js HTTP Server)
    - `server.js` - API server on port 3001
-   - Endpoints: GET /api/tasks, GET /api/projects, POST /api/tasks, PUT /api/tasks/:taskId
+   - Endpoints:
+     - GET /api/tasks - List all tasks
+     - GET /api/projects - List all projects
+     - POST /api/tasks - Create new task
+     - PUT /api/tasks/:taskId - Update task
+     - POST /api/ralph/execute - Trigger Ralph execution
+     - GET /api/ralph/status - Check Ralph execution status
 
 3. **Deployment**
    - Nginx reverse proxy on tasks.chinmaypandhare.uk
@@ -135,6 +141,29 @@ tail -f /var/log/nginx/tasks.chinmaypandhare.uk.error.log
 4. Reload nginx if config changed: `systemctl reload nginx`
 5. Verify in browser at https://tasks.chinmaypandhare.uk
 
+## Ralph Execution
+
+The task management app includes Ralph execution capability:
+
+- **Trigger Ralph:** Click "Run Ralph" button on main page
+- **Status Tracking:** Button disables during execution and shows "Ralph Running..."
+- **Auto-Refresh:** Task list refreshes automatically when Ralph completes
+- **Safety:** Prevents concurrent executions (returns 409 if already running)
+- **Authentication:** Requires Bearer token authentication
+- **Polling:** Status checked every 3 seconds during execution
+- **Backend:** Uses child_process.spawn to run `/var/main/scripts/ralph-once.sh`
+
+**Testing Ralph execution:**
+```bash
+# Check status
+curl -H "Authorization: Bearer e2b4e38fed003ce3e1aceb2d2cff3c606ab8bf13a970e0e02e71b372cf4bd0f6" \
+  http://localhost:3001/api/ralph/status
+
+# Trigger execution
+curl -X POST -H "Authorization: Bearer e2b4e38fed003ce3e1aceb2d2cff3c606ab8bf13a970e0e02e71b372cf4bd0f6" \
+  http://localhost:3001/api/ralph/execute
+```
+
 ## File Paths
 
 - Tasks data: `/var/main/tasks.json`
@@ -142,3 +171,4 @@ tail -f /var/log/nginx/tasks.chinmaypandhare.uk.error.log
 - Application root: `/var/www/tasks.chinmaypandhare.uk`
 - Nginx config: `/etc/nginx/sites-available/tasks.chinmaypandhare.uk`
 - Systemd service: `/etc/systemd/system/tasks-api.service`
+- Ralph script: `/var/main/scripts/ralph-once.sh`
