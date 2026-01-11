@@ -143,10 +143,125 @@ function renderOpenTasks(tasks) {
     taskList.innerHTML = html;
 }
 
+// Render completed tasks
+function renderCompletedTasks(tasks) {
+    const taskList = document.getElementById('taskList');
+
+    if (!tasks || tasks.length === 0) {
+        taskList.innerHTML = '<p class="no-tasks">No tasks found.</p>';
+        return;
+    }
+
+    // Filter for completed tasks (completed = true)
+    const completedTasks = tasks.filter(task => task.completed);
+
+    if (completedTasks.length === 0) {
+        taskList.innerHTML = '<p class="no-tasks">No completed tasks yet.</p>';
+        return;
+    }
+
+    // Group by project
+    const grouped = groupTasksByProject(completedTasks);
+
+    let html = '';
+
+    Object.keys(grouped).sort().forEach(projectName => {
+        const projectTasks = grouped[projectName];
+
+        html += `
+            <div class="project-group">
+                <h3 class="project-title">${projectName}</h3>
+                <div class="project-tasks">
+        `;
+
+        projectTasks.forEach(task => {
+            html += `
+                <div class="task-card completed-task">
+                    <div class="task-header">
+                        <div class="task-title-row">
+                            <span class="task-id">${task.id}</span>
+                            <h4 class="task-title">${task.title}</h4>
+                        </div>
+                        <span class="task-status status-completed">Completed</span>
+                    </div>
+
+                    <div class="task-meta-info">
+                        <span class="meta-item">Created: ${task.created}</span>
+                        <span class="meta-item">Project: ${task.project}</span>
+                    </div>
+
+                    <div class="task-requirements">
+                        <div class="requirements-header">
+                            <strong>Requirements:</strong>
+                            <button class="toggle-btn" id="toggle-${task.id}" onclick="toggleRequirements('${task.id}')">▶</button>
+                        </div>
+                        <ul class="requirements-list hidden" id="req-${task.id}">
+            `;
+
+            task.requirements.forEach(req => {
+                html += `<li>${req}</li>`;
+            });
+
+            html += `
+                        </ul>
+                    </div>
+            `;
+
+            if (task.notes && task.notes.trim() !== '') {
+                html += `
+                    <div class="task-notes">
+                        <strong>Notes:</strong> ${task.notes}
+                    </div>
+                `;
+            }
+
+            html += `
+                </div>
+            `;
+        });
+
+        html += `
+                </div>
+            </div>
+        `;
+    });
+
+    taskList.innerHTML = html;
+}
+
+// Store current view and tasks
+let currentView = 'open';
+let allTasks = null;
+
+// Show open tasks view
+function showOpenTasks() {
+    currentView = 'open';
+    document.getElementById('openTasksBtn').classList.add('active');
+    document.getElementById('completedTasksBtn').classList.remove('active');
+    if (allTasks) {
+        renderOpenTasks(allTasks);
+    }
+}
+
+// Show completed tasks view
+function showCompletedTasks() {
+    currentView = 'completed';
+    document.getElementById('completedTasksBtn').classList.add('active');
+    document.getElementById('openTasksBtn').classList.remove('active');
+    if (allTasks) {
+        renderCompletedTasks(allTasks);
+    }
+}
+
 // Initialize the page
 async function initializePage() {
     const tasks = await fetchTasks();
-    renderOpenTasks(tasks);
+    allTasks = tasks;
+    if (currentView === 'open') {
+        renderOpenTasks(tasks);
+    } else {
+        renderCompletedTasks(tasks);
+    }
 }
 
 // Load tasks when page loads

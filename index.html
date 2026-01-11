@@ -18,7 +18,10 @@
 
     <main class="container">
         <div class="content-area">
-            <h2>Open Tasks</h2>
+            <div class="view-controls">
+                <button id="openTasksBtn" class="view-btn active" onclick="showOpenTasks()">Open Tasks</button>
+                <button id="completedTasksBtn" class="view-btn" onclick="showCompletedTasks()">Completed Tasks</button>
+            </div>
             <div id="taskList">
                 <p class="loading">Loading tasks...</p>
             </div>
