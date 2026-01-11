@@ -14,6 +14,7 @@ const PORT = process.env.PORT || 3001;
 // Path to tasks.json and projects.json
 const TASKS_FILE = '/var/main/tasks.json';
 const PROJECTS_FILE = '/var/main/projects.json';
+const LOGS_FILE = '/var/main/logs/progress.txt';
 
 // Ralph execution tracking
 let ralphRunning = false;
@@ -364,6 +365,32 @@ const server = http.createServer((req, res) => {
         sendJSON(res, 200, {
             running: ralphRunning,
             status: ralphRunning ? 'running' : 'idle'
+        });
+        return;
+    }
+
+    // API endpoint: GET /api/ralph/logs
+    if (pathname === '/api/ralph/logs' && req.method === 'GET') {
+        // Check authentication
+        if (!isAuthenticated(req)) {
+            sendError(res, 401, 'Unauthorized: Invalid or missing authentication token');
+            return;
+        }
+
+        // Read logs file
+        fs.readFile(LOGS_FILE, 'utf8', (err, data) => {
+            if (err) {
+                if (err.code === 'ENOENT') {
+                    // File doesn't exist yet
+                    sendJSON(res, 200, { logs: '', exists: false });
+                } else {
+                    console.error('Error reading logs file:', err);
+                    sendError(res, 500, 'Failed to read logs file');
+                }
+                return;
+            }
+
+            sendJSON(res, 200, { logs: data, exists: true });
         });
         return;
     }

@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ralph Execution Logs - Task Manager</title>
+    <link rel="stylesheet" href="style.css">
+    <style>
+        .logs-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .logs-controls {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .logs-container {
+            background: #1e1e1e;
+            color: #d4d4d4;
+            border-radius: 8px;
+            padding: 20px;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+            line-height: 1.6;
+            max-height: 70vh;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+
+        .logs-empty {
+            text-align: center;
+            color: #888;
+            padding: 40px;
+            font-style: italic;
+        }
+
+        .filter-input {
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 14px;
+            min-width: 200px;
+        }
+
+        .filter-input:focus {
+            outline: none;
+            border-color: #3498db;
+        }
+
+        .logs-stats {
+            font-size: 14px;
+            color: #666;
+        }
+
+        .log-section {
+            margin-bottom: 30px;
+            border-left: 3px solid #3498db;
+            padding-left: 15px;
+        }
+
+        .log-header {
+            color: #61afef;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+
+        .log-task-id {
+            color: #e5c07b;
+        }
+
+        .log-project {
+            color: #98c379;
+        }
+
+        .log-date {
+            color: #c678dd;
+        }
+
+        .log-requirement {
+            color: #56b6c2;
+        }
+
+        .log-learning {
+            color: #e06c75;
+            font-style: italic;
+        }
+
+        .log-separator {
+            border-top: 1px solid #444;
+            margin: 20px 0;
+        }
+
+        .refresh-indicator {
+            display: inline-block;
+            margin-left: 10px;
+            color: #3498db;
+            font-size: 12px;
+        }
+
+        .auto-refresh-toggle {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 14px;
+        }
+
+        .toggle-switch {
+            position: relative;
+            display: inline-block;
+            width: 44px;
+            height: 24px;
+        }
+
+        .toggle-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .toggle-slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #ccc;
+            border-radius: 24px;
+            transition: 0.3s;
+        }
+
+        .toggle-slider:before {
+            position: absolute;
+            content: "";
+            height: 18px;
+            width: 18px;
+            left: 3px;
+            bottom: 3px;
+            background-color: white;
+            border-radius: 50%;
+            transition: 0.3s;
+        }
+
+        input:checked + .toggle-slider {
+            background-color: #3498db;
+        }
+
+        input:checked + .toggle-slider:before {
+            transform: translateX(20px);
+        }
+
+        @media (max-width: 768px) {
+            .logs-container {
+                font-size: 12px;
+                padding: 15px;
+                max-height: 60vh;
+            }
+
+            .filter-input {
+                min-width: 150px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="page-header">
+            <h1>Ralph Execution Logs</h1>
+            <button onclick="window.location.href='index.html'" class="btn btn-secondary">← Back to Tasks</button>
+        </div>
+
+        <div class="logs-header">
+            <div class="logs-controls">
+                <input type="text" id="filterInput" class="filter-input" placeholder="Filter by task ID, project, or date...">
+                <button onclick="clearFilter()" class="btn btn-secondary">Clear Filter</button>
+                <button onclick="refreshLogs()" class="btn btn-primary">🔄 Refresh</button>
+            </div>
+            <div class="auto-refresh-toggle">
+                <span>Auto-refresh:</span>
+                <label class="toggle-switch">
+                    <input type="checkbox" id="autoRefreshToggle" onchange="toggleAutoRefresh()">
+                    <span class="toggle-slider"></span>
+                </label>
+                <span id="refreshIndicator" class="refresh-indicator" style="display: none;">↻</span>
+            </div>
+        </div>
+
+        <div class="logs-stats" id="logsStats">
+            <span id="statsText">Loading logs...</span>
+        </div>
+
+        <div id="logsContainer" class="logs-container">
+            <div class="logs-empty">Loading logs...</div>
+        </div>
+    </div>
+
+    <script src="auth.js"></script>
+    <script src="logs.js"></script>
+</body>
+</html>
