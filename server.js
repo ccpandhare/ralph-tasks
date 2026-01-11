@@ -9,8 +9,9 @@ const PASSWORD_HASH = "240be518fabd2724ddb6f04eeb1da5967448d7e831c08c8fa822809f7
 // Port configuration
 const PORT = process.env.PORT || 3001;
 
-// Path to tasks.json
+// Path to tasks.json and projects.json
 const TASKS_FILE = '/var/main/tasks.json';
+const PROJECTS_FILE = '/var/main/projects.json';
 
 // Helper function to check authentication
 function isAuthenticated(req) {
@@ -78,6 +79,33 @@ const server = http.createServer((req, res) => {
             } catch (parseErr) {
                 console.error('Error parsing tasks.json:', parseErr);
                 sendError(res, 500, 'Failed to parse tasks file');
+            }
+        });
+        return;
+    }
+
+    // API endpoint: GET /api/projects
+    if (pathname === '/api/projects' && req.method === 'GET') {
+        // Check authentication
+        if (!isAuthenticated(req)) {
+            sendError(res, 401, 'Unauthorized: Invalid or missing authentication token');
+            return;
+        }
+
+        // Read projects.json
+        fs.readFile(PROJECTS_FILE, 'utf8', (err, data) => {
+            if (err) {
+                console.error('Error reading projects.json:', err);
+                sendError(res, 500, 'Failed to read projects file');
+                return;
+            }
+
+            try {
+                const projectsData = JSON.parse(data);
+                sendJSON(res, 200, projectsData);
+            } catch (parseErr) {
+                console.error('Error parsing projects.json:', parseErr);
+                sendError(res, 500, 'Failed to parse projects file');
             }
         });
         return;

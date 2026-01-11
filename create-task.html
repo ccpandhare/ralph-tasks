@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Create New Task - Task Manager">
+    <meta name="author" content="Chinmay Pandhare">
+    <title>Create New Task - Task Manager</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <header>
+        <div class="container header-content">
+            <h1>Task Manager</h1>
+            <button id="logoutBtn" class="btn btn-secondary" onclick="logout()">Logout</button>
+        </div>
+    </header>
+
+    <main class="container">
+        <div class="content-area">
+            <div class="page-header">
+                <h2>Create New Task</h2>
+                <a href="index.html" class="btn btn-secondary">Back to Tasks</a>
+            </div>
+
+            <div id="successMessage" class="message success-message hidden">
+                <p>Task created successfully!</p>
+            </div>
+
+            <div id="errorMessage" class="message error-message hidden">
+                <p></p>
+            </div>
+
+            <form id="createTaskForm" class="task-form">
+                <div class="form-group">
+                    <label for="project">Project *</label>
+                    <select id="project" name="project" required>
+                        <option value="">-- Select Project --</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="title">Task Title *</label>
+                    <input type="text" id="title" name="title" required placeholder="Enter task title">
+                </div>
+
+                <div class="form-group">
+                    <label>Requirements *</label>
+                    <div id="requirementsList" class="requirements-input-list">
+                        <div class="requirement-item">
+                            <input type="text" class="requirement-input" placeholder="Enter requirement" required>
+                            <button type="button" class="btn btn-remove" onclick="removeRequirement(this)">Remove</button>
+                        </div>
+                    </div>
+                    <button type="button" class="btn btn-secondary" onclick="addRequirement()">Add Requirement</button>
+                </div>
+
+                <div class="form-group">
+                    <label for="notes">Notes</label>
+                    <textarea id="notes" name="notes" rows="4" placeholder="Optional notes or context"></textarea>
+                </div>
+
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-primary">Create Task</button>
+                    <button type="button" class="btn btn-secondary" onclick="resetForm()">Reset</button>
+                </div>
+            </form>
+        </div>
+    </main>
+
+    <script src="auth.js"></script>
+    <script src="create-task.js"></script>
+</body>
+</html>

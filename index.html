@@ -18,9 +18,12 @@
 
     <main class="container">
         <div class="content-area">
-            <div class="view-controls">
-                <button id="openTasksBtn" class="view-btn active" onclick="showOpenTasks()">Open Tasks</button>
-                <button id="completedTasksBtn" class="view-btn" onclick="showCompletedTasks()">Completed Tasks</button>
+            <div class="page-actions">
+                <div class="view-controls">
+                    <button id="openTasksBtn" class="view-btn active" onclick="showOpenTasks()">Open Tasks</button>
+                    <button id="completedTasksBtn" class="view-btn" onclick="showCompletedTasks()">Completed Tasks</button>
+                </div>
+                <a href="create-task.html" class="btn btn-primary">Create New Task</a>
             </div>
             <div id="taskList">
                 <p class="loading">Loading tasks...</p>
