@@ -1,5 +1,6 @@
 // Task management functionality
 const API_URL = '/api/tasks';
+const RALPH_API_URL = '/api/ralph';
 
 // Update task (mark as complete)
 async function updateTask(taskId, updateData) {
@@ -356,7 +357,133 @@ async function initializePage() {
     }
 }
 
+// Ralph execution functions
+async function executeRalph() {
+    const token = getAuthToken();
+    if (!token) {
+        console.error('No authentication token available');
+        showMessage('Not authenticated', 'error');
+        return;
+    }
+
+    // Confirm action
+    const confirmed = confirm('Start Ralph execution?\n\nRalph will work on the most important task automatically.\n\nThis may take several minutes.');
+    if (!confirmed) {
+        return;
+    }
+
+    // Show loading message
+    showMessage('Starting Ralph execution...', 'info');
+
+    try {
+        const response = await fetch(`${RALPH_API_URL}/execute`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            }
+        });
+
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+        }
+
+        const data = await response.json();
+        showMessage('Ralph execution started! Status will be updated automatically.', 'success');
+
+        // Start polling for status
+        startRalphStatusPolling();
+    } catch (error) {
+        console.error('Error starting Ralph:', error);
+        showMessage(`Error: ${error.message}`, 'error');
+    }
+}
+
+async function checkRalphStatus() {
+    const token = getAuthToken();
+    if (!token) {
+        return null;
+    }
+
+    try {
+        const response = await fetch(`${RALPH_API_URL}/status`, {
+            method: 'GET',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            }
+        });
+
+        if (!response.ok) {
+            return null;
+        }
+
+        const data = await response.json();
+        return data;
+    } catch (error) {
+        console.error('Error checking Ralph status:', error);
+        return null;
+    }
+}
+
+let ralphStatusInterval = null;
+
+function startRalphStatusPolling() {
+    // Clear any existing interval
+    if (ralphStatusInterval) {
+        clearInterval(ralphStatusInterval);
+    }
+
+    // Update button state
+    updateRalphButton(true);
+
+    // Poll every 3 seconds
+    ralphStatusInterval = setInterval(async () => {
+        const status = await checkRalphStatus();
+
+        if (status && !status.running) {
+            // Ralph finished
+            clearInterval(ralphStatusInterval);
+            ralphStatusInterval = null;
+            updateRalphButton(false);
+            showMessage('Ralph execution completed! Refreshing task list...', 'success');
+
+            // Refresh task list after 2 seconds
+            setTimeout(() => {
+                initializePage();
+            }, 2000);
+        }
+    }, 3000);
+}
+
+function updateRalphButton(running) {
+    const ralphBtn = document.getElementById('ralphBtn');
+    if (!ralphBtn) return;
+
+    if (running) {
+        ralphBtn.textContent = 'Ralph Running...';
+        ralphBtn.disabled = true;
+        ralphBtn.classList.add('disabled');
+    } else {
+        ralphBtn.textContent = 'Run Ralph';
+        ralphBtn.disabled = false;
+        ralphBtn.classList.remove('disabled');
+    }
+}
+
+// Check Ralph status on page load
+async function checkInitialRalphStatus() {
+    const status = await checkRalphStatus();
+    if (status && status.running) {
+        updateRalphButton(true);
+        startRalphStatusPolling();
+        showMessage('Ralph is currently running...', 'info');
+    }
+}
+
 // Load tasks when page loads
 if (document.getElementById('taskList')) {
     initializePage();
+    checkInitialRalphStatus();
 }

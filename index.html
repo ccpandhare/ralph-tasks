@@ -23,7 +23,10 @@
                     <button id="openTasksBtn" class="view-btn active" onclick="showOpenTasks()">Open Tasks</button>
                     <button id="completedTasksBtn" class="view-btn" onclick="showCompletedTasks()">Completed Tasks</button>
                 </div>
-                <a href="create-task.html" class="btn btn-primary">Create New Task</a>
+                <div class="action-buttons">
+                    <button id="ralphBtn" class="btn btn-ralph" onclick="executeRalph()">Run Ralph</button>
+                    <a href="create-task.html" class="btn btn-primary">Create New Task</a>
+                </div>
             </div>
             <div id="taskList">
                 <p class="loading">Loading tasks...</p>

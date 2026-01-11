@@ -364,9 +364,34 @@ main {
     border-bottom: none;
 }
 
+.page-actions .action-buttons {
+    display: flex;
+    gap: 0.75rem;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
 .page-actions .btn-primary {
     width: auto;
     white-space: nowrap;
+}
+
+/* Ralph button */
+.btn-ralph {
+    background-color: #8e44ad;
+    color: white;
+    text-decoration: none;
+    display: inline-block;
+}
+
+.btn-ralph:hover:not(.disabled) {
+    background-color: #6c3483;
+}
+
+.btn-ralph.disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    background-color: #95a5a6;
 }
 
 /* Page header */
@@ -607,7 +632,13 @@ main {
         align-items: stretch;
     }
 
-    .page-actions .btn-primary {
+    .page-actions .action-buttons {
+        flex-direction: column;
+        width: 100%;
+    }
+
+    .page-actions .btn-primary,
+    .page-actions .btn-ralph {
         width: 100%;
     }
 

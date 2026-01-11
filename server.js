@@ -2,6 +2,7 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const url = require('url');
+const { spawn } = require('child_process');
 
 // Hardcoded password hash for authentication (same as in auth.js)
 // Password: 4wJkq5b6fmtuG3Nv1lHxJXYenULuE/j7dW1SksImqZ8=
@@ -13,6 +14,10 @@ const PORT = process.env.PORT || 3001;
 // Path to tasks.json and projects.json
 const TASKS_FILE = '/var/main/tasks.json';
 const PROJECTS_FILE = '/var/main/projects.json';
+
+// Ralph execution tracking
+let ralphRunning = false;
+let ralphProcess = null;
 
 // Helper function to check authentication
 function isAuthenticated(req) {
@@ -31,7 +36,7 @@ function sendJSON(res, statusCode, data) {
     res.writeHead(statusCode, {
         'Content-Type': 'application/json',
         'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Methods': 'GET, POST, PUT, OPTIONS',
+        'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
         'Access-Control-Allow-Headers': 'Content-Type, Authorization'
     });
     res.end(JSON.stringify(data));
@@ -51,7 +56,7 @@ const server = http.createServer((req, res) => {
     if (req.method === 'OPTIONS') {
         res.writeHead(200, {
             'Access-Control-Allow-Origin': '*',
-            'Access-Control-Allow-Methods': 'GET, POST, PUT, OPTIONS',
+            'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
             'Access-Control-Allow-Headers': 'Content-Type, Authorization'
         });
         res.end();
@@ -286,6 +291,80 @@ const server = http.createServer((req, res) => {
             }
         });
 
+        return;
+    }
+
+    // API endpoint: POST /api/ralph/execute
+    if (pathname === '/api/ralph/execute' && req.method === 'POST') {
+        // Check authentication
+        if (!isAuthenticated(req)) {
+            sendError(res, 401, 'Unauthorized: Invalid or missing authentication token');
+            return;
+        }
+
+        // Check if Ralph is already running
+        if (ralphRunning) {
+            sendError(res, 409, 'Ralph is already running');
+            return;
+        }
+
+        // Mark Ralph as running
+        ralphRunning = true;
+
+        // Execute ralph-once.sh
+        const ralphScript = '/var/main/scripts/ralph-once.sh';
+        ralphProcess = spawn('bash', [ralphScript], {
+            cwd: '/var/main',
+            stdio: 'pipe'
+        });
+
+        let output = '';
+        let errorOutput = '';
+
+        ralphProcess.stdout.on('data', (data) => {
+            output += data.toString();
+        });
+
+        ralphProcess.stderr.on('data', (data) => {
+            errorOutput += data.toString();
+        });
+
+        ralphProcess.on('close', (code) => {
+            ralphRunning = false;
+            ralphProcess = null;
+            console.log(`Ralph execution completed with code ${code}`);
+            if (code !== 0) {
+                console.error('Ralph error output:', errorOutput);
+            }
+        });
+
+        ralphProcess.on('error', (err) => {
+            ralphRunning = false;
+            ralphProcess = null;
+            console.error('Ralph process error:', err);
+        });
+
+        // Return immediately after starting
+        sendJSON(res, 202, {
+            success: true,
+            message: 'Ralph execution started',
+            status: 'running'
+        });
+        return;
+    }
+
+    // API endpoint: GET /api/ralph/status
+    if (pathname === '/api/ralph/status' && req.method === 'GET') {
+        // Check authentication
+        if (!isAuthenticated(req)) {
+            sendError(res, 401, 'Unauthorized: Invalid or missing authentication token');
+            return;
+        }
+
+        sendJSON(res, 200, {
+            running: ralphRunning,
+            status: ralphRunning ? 'running' : 'idle'
+        });
         return;
     }
 
