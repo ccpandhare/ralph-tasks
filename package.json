@@ -1,0 +1,13 @@
+{
+  "name": "task-manager-api",
+  "version": "1.0.0",
+  "description": "Backend API for Task Manager web application",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "keywords": ["task-manager", "api"],
+  "author": "Chinmay Pandhare",
+  "license": "MIT"
+}

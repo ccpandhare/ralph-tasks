@@ -51,6 +51,12 @@ if (document.getElementById('loginForm')) {
     });
 }
 
+// Get authentication token for API requests
+function getAuthToken() {
+    if (!isAuthenticated()) return null;
+    return PASSWORD_HASH;
+}
+
 // Redirect to login if not authenticated (for protected pages)
 if (window.location.pathname.includes('index.html') || window.location.pathname.endsWith('/')) {
     if (!isAuthenticated()) {
