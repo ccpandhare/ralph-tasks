@@ -1,7 +1,7 @@
 // Hardcoded SHA-256 hash of the password
-// For demo purposes, the password is "admin123"
-// Hash generated using: echo -n "admin123" | sha256sum
-const PASSWORD_HASH = "240be518fabd2724ddb6f04eeb1da5967448d7e831c08c8fa822809f74c720a9";
+// Password: 4wJkq5b6fmtuG3Nv1lHxJXYenULuE/j7dW1SksImqZ8=
+// Hash generated using: echo -n "4wJkq5b6fmtuG3Nv1lHxJXYenULuE/j7dW1SksImqZ8=" | sha256sum
+const PASSWORD_HASH = "e2b4e38fed003ce3e1aceb2d2cff3c606ab8bf13a970e0e02e71b372cf4bd0f6";
 
 // Check if user is already authenticated
 function isAuthenticated() {

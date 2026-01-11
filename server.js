@@ -4,7 +4,8 @@ const path = require('path');
 const url = require('url');
 
 // Hardcoded password hash for authentication (same as in auth.js)
-const PASSWORD_HASH = "240be518fabd2724ddb6f04eeb1da5967448d7e831c08c8fa822809f74c720a9";
+// Password: 4wJkq5b6fmtuG3Nv1lHxJXYenULuE/j7dW1SksImqZ8=
+const PASSWORD_HASH = "e2b4e38fed003ce3e1aceb2d2cff3c606ab8bf13a970e0e02e71b372cf4bd0f6";
 
 // Port configuration
 const PORT = process.env.PORT || 3001;
