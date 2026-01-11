@@ -1,6 +1,93 @@
 // Task management functionality
 const API_URL = '/api/tasks';
 
+// Update task (mark as complete)
+async function updateTask(taskId, updateData) {
+    const token = getAuthToken();
+    if (!token) {
+        console.error('No authentication token available');
+        return { success: false, error: 'Not authenticated' };
+    }
+
+    try {
+        const response = await fetch(`${API_URL}/${taskId}`, {
+            method: 'PUT',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(updateData)
+        });
+
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+        }
+
+        const data = await response.json();
+        return { success: true, task: data.task };
+    } catch (error) {
+        console.error('Error updating task:', error);
+        return { success: false, error: error.message };
+    }
+}
+
+// Mark task as complete with confirmation
+async function markTaskComplete(taskId, taskTitle) {
+    // Show confirmation dialog
+    const confirmed = confirm(`Mark task as complete?\n\n"${taskTitle}"\n\nThis will set both status and completed fields to true.`);
+
+    if (!confirmed) {
+        return;
+    }
+
+    // Show loading message
+    showMessage('Marking task as complete...', 'info');
+
+    // Call API to update task
+    const result = await updateTask(taskId, {
+        status: true,
+        completed: true
+    });
+
+    if (result.success) {
+        showMessage('Task marked as complete successfully!', 'success');
+        // Refresh the task list
+        setTimeout(() => {
+            initializePage();
+        }, 1000);
+    } else {
+        showMessage(`Error: ${result.error}`, 'error');
+    }
+}
+
+// Show message to user
+function showMessage(text, type) {
+    // Check if message container exists, create if not
+    let messageDiv = document.getElementById('messageContainer');
+    if (!messageDiv) {
+        messageDiv = document.createElement('div');
+        messageDiv.id = 'messageContainer';
+        messageDiv.className = 'message-container';
+        const mainContent = document.querySelector('main');
+        mainContent.insertBefore(messageDiv, mainContent.firstChild);
+    }
+
+    // Set message content and type
+    messageDiv.textContent = text;
+    messageDiv.className = `message-container message-${type}`;
+    messageDiv.style.display = 'block';
+
+    // Auto-hide after 5 seconds for success/error messages
+    if (type === 'success' || type === 'error') {
+        setTimeout(() => {
+            messageDiv.style.display = 'none';
+        }, 5000);
+    } else if (type === 'info') {
+        // Keep info messages visible
+    }
+}
+
 // Fetch tasks from API
 async function fetchTasks() {
     const token = getAuthToken();
@@ -129,6 +216,11 @@ function renderOpenTasks(tasks) {
             html += `
                     <div class="task-meta">
                         <span>Created: ${task.created}</span>
+                    </div>
+                    <div class="task-actions">
+                        <button class="btn-complete" onclick="markTaskComplete('${task.id}', '${task.title.replace(/'/g, "\\'")}')">
+                            Mark as Complete
+                        </button>
                     </div>
                 </div>
             `;

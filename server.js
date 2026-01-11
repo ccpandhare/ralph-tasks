@@ -201,6 +201,93 @@ const server = http.createServer((req, res) => {
         return;
     }
 
+    // API endpoint: PUT /api/tasks/:taskId
+    if (pathname.startsWith('/api/tasks/') && req.method === 'PUT') {
+        // Check authentication
+        if (!isAuthenticated(req)) {
+            sendError(res, 401, 'Unauthorized: Invalid or missing authentication token');
+            return;
+        }
+
+        // Extract task ID from URL
+        const taskId = pathname.substring('/api/tasks/'.length);
+
+        // Collect request body
+        let body = '';
+        req.on('data', chunk => {
+            body += chunk.toString();
+        });
+
+        req.on('end', () => {
+            try {
+                const updateData = JSON.parse(body);
+
+                // Read existing tasks
+                fs.readFile(TASKS_FILE, 'utf8', (err, data) => {
+                    if (err) {
+                        console.error('Error reading tasks.json:', err);
+                        sendError(res, 500, 'Failed to read tasks file');
+                        return;
+                    }
+
+                    try {
+                        const tasksData = JSON.parse(data);
+
+                        // Find task by ID
+                        const taskIndex = tasksData.tasks.findIndex(t => t.id === taskId);
+                        if (taskIndex === -1) {
+                            sendError(res, 404, 'Task not found');
+                            return;
+                        }
+
+                        // Update task fields
+                        const task = tasksData.tasks[taskIndex];
+                        if (typeof updateData.status === 'boolean') {
+                            task.status = updateData.status;
+                        }
+                        if (typeof updateData.completed === 'boolean') {
+                            task.completed = updateData.completed;
+                        }
+
+                        // Write atomically using temporary file
+                        const tmpFile = TASKS_FILE + '.tmp';
+                        const jsonContent = JSON.stringify(tasksData, null, 2) + '\n';
+
+                        fs.writeFile(tmpFile, jsonContent, 'utf8', (writeErr) => {
+                            if (writeErr) {
+                                console.error('Error writing temp file:', writeErr);
+                                sendError(res, 500, 'Failed to write tasks file');
+                                return;
+                            }
+
+                            // Atomically rename temp file to actual file
+                            fs.rename(tmpFile, TASKS_FILE, (renameErr) => {
+                                if (renameErr) {
+                                    console.error('Error renaming temp file:', renameErr);
+                                    // Clean up temp file
+                                    fs.unlink(tmpFile, () => {});
+                                    sendError(res, 500, 'Failed to save tasks file');
+                                    return;
+                                }
+
+                                // Success!
+                                sendJSON(res, 200, { success: true, task: task });
+                            });
+                        });
+                    } catch (parseErr) {
+                        console.error('Error parsing tasks.json:', parseErr);
+                        sendError(res, 500, 'Failed to parse tasks file');
+                    }
+                });
+            } catch (parseErr) {
+                console.error('Error parsing request body:', parseErr);
+                sendError(res, 400, 'Invalid JSON in request body');
+            }
+        });
+
+        return;
+    }
+
     // Handle 404 for other routes
     sendError(res, 404, 'Not found');
 });
