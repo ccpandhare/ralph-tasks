@@ -258,15 +258,40 @@ async function handleSubmit(event) {
         notes: notes
     };
 
-    // Submit to API (this will be implemented in task-008)
-    // For now, we'll just show a message that the frontend is ready
-    console.log('New task to be created:', newTask);
-    showSuccess(`Task ${taskId} created successfully! (Note: Backend endpoint not yet implemented)`);
+    // Submit to API
+    const token = getAuthToken();
+    if (!token) {
+        showError('Authentication required. Please log in.');
+        return;
+    }
 
-    // Reset form after successful creation
-    setTimeout(() => {
-        resetForm();
-    }, 1000);
+    try {
+        const response = await fetch(API_URL, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(newTask)
+        });
+
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+        }
+
+        const result = await response.json();
+        console.log('Task created successfully:', result);
+        showSuccess(`Task ${taskId} created successfully!`);
+
+        // Reset form after successful creation
+        setTimeout(() => {
+            resetForm();
+        }, 1000);
+    } catch (error) {
+        console.error('Error creating task:', error);
+        showError(`Failed to create task: ${error.message}`);
+    }
 }
 
 // Initialize the page

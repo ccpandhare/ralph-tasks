@@ -111,6 +111,96 @@ const server = http.createServer((req, res) => {
         return;
     }
 
+    // API endpoint: POST /api/tasks
+    if (pathname === '/api/tasks' && req.method === 'POST') {
+        // Check authentication
+        if (!isAuthenticated(req)) {
+            sendError(res, 401, 'Unauthorized: Invalid or missing authentication token');
+            return;
+        }
+
+        // Collect request body
+        let body = '';
+        req.on('data', chunk => {
+            body += chunk.toString();
+        });
+
+        req.on('end', () => {
+            try {
+                const newTask = JSON.parse(body);
+
+                // Validate required fields
+                if (!newTask.id || !newTask.project || !newTask.title || !newTask.requirements || !Array.isArray(newTask.requirements)) {
+                    sendError(res, 400, 'Invalid task data: missing required fields');
+                    return;
+                }
+
+                // Ensure status and completed are set
+                if (typeof newTask.status !== 'boolean' || typeof newTask.completed !== 'boolean') {
+                    sendError(res, 400, 'Invalid task data: status and completed must be boolean');
+                    return;
+                }
+
+                // Read existing tasks
+                fs.readFile(TASKS_FILE, 'utf8', (err, data) => {
+                    if (err) {
+                        console.error('Error reading tasks.json:', err);
+                        sendError(res, 500, 'Failed to read tasks file');
+                        return;
+                    }
+
+                    try {
+                        const tasksData = JSON.parse(data);
+
+                        // Check if task ID already exists
+                        const existingTask = tasksData.tasks.find(t => t.id === newTask.id);
+                        if (existingTask) {
+                            sendError(res, 409, 'Task ID already exists');
+                            return;
+                        }
+
+                        // Append new task
+                        tasksData.tasks.push(newTask);
+
+                        // Write atomically using temporary file
+                        const tmpFile = TASKS_FILE + '.tmp';
+                        const jsonContent = JSON.stringify(tasksData, null, 2) + '\n';
+
+                        fs.writeFile(tmpFile, jsonContent, 'utf8', (writeErr) => {
+                            if (writeErr) {
+                                console.error('Error writing temp file:', writeErr);
+                                sendError(res, 500, 'Failed to write tasks file');
+                                return;
+                            }
+
+                            // Atomically rename temp file to actual file
+                            fs.rename(tmpFile, TASKS_FILE, (renameErr) => {
+                                if (renameErr) {
+                                    console.error('Error renaming temp file:', renameErr);
+                                    // Clean up temp file
+                                    fs.unlink(tmpFile, () => {});
+                                    sendError(res, 500, 'Failed to save tasks file');
+                                    return;
+                                }
+
+                                // Success!
+                                sendJSON(res, 201, { success: true, task: newTask });
+                            });
+                        });
+                    } catch (parseErr) {
+                        console.error('Error parsing tasks.json:', parseErr);
+                        sendError(res, 500, 'Failed to parse tasks file');
+                    }
+                });
+            } catch (parseErr) {
+                console.error('Error parsing request body:', parseErr);
+                sendError(res, 400, 'Invalid JSON in request body');
+            }
+        });
+
+        return;
+    }
+
     // Handle 404 for other routes
     sendError(res, 404, 'Not found');
 });
