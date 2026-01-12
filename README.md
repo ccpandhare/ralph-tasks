@@ -53,6 +53,59 @@ Authorization: Bearer <password_hash>
 - Frontend uses sessionStorage for authentication state
 - Backend uses Bearer token authentication with password hash
 
+## Testing
+
+### Running Tests
+
+This project includes end-to-end tests using Puppeteer and Jest.
+
+**Run all tests:**
+```bash
+npm test
+```
+
+**Run only e2e tests:**
+```bash
+npm run test:e2e
+```
+
+**Run tests with custom URL:**
+```bash
+TEST_URL=https://your-domain.com npm test
+```
+
+### Test Configuration
+
+- Tests run in headless mode by default (suitable for CI/CD)
+- Default timeout: 30 seconds per test
+- Test environment: Node.js
+- Tests are located in `tests/e2e/` directory
+
+### Writing Tests
+
+E2E tests use Puppeteer to automate browser interactions. Example structure:
+
+```javascript
+describe('Test Suite', () => {
+  let browser;
+  let page;
+
+  beforeAll(async () => {
+    browser = await puppeteer.launch({ headless: true });
+  });
+
+  afterAll(async () => {
+    await browser.close();
+  });
+
+  test('should do something', async () => {
+    page = await browser.newPage();
+    await page.goto('https://example.com');
+    // Your test assertions here
+  });
+});
+```
+
 ## Project Structure
 
 - `index.html` - Main application page
@@ -61,3 +114,4 @@ Authorization: Bearer <password_hash>
 - `style.css` - Custom styles
 - `server.js` - Backend API server
 - `package.json` - Node.js project configuration
+- `tests/e2e/` - End-to-end tests using Puppeteer

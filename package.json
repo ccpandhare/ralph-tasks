@@ -5,9 +5,23 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "dev": "node server.js"
+    "dev": "node server.js",
+    "test": "jest",
+    "test:e2e": "jest tests/e2e"
   },
-  "keywords": ["task-manager", "api"],
+  "jest": {
+    "testEnvironment": "node",
+    "testTimeout": 30000,
+    "testMatch": ["**/tests/**/*.test.js"]
+  },
+  "keywords": [
+    "task-manager",
+    "api"
+  ],
   "author": "Chinmay Pandhare",
-  "license": "MIT"
+  "license": "MIT",
+  "devDependencies": {
+    "jest": "^30.2.0",
+    "puppeteer": "^24.35.0"
+  }
 }
