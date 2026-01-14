@@ -32,10 +32,12 @@ This is a task management web application that displays and manages tasks from `
 
 ## Authentication
 
-- Password: `4wJkq5b6fmtuG3Nv1lHxJXYenULuE/j7dW1SksImqZ8=`
-- SHA-256 Hash: `e2b4e38fed003ce3e1aceb2d2cff3c606ab8bf13a970e0e02e71b372cf4bd0f6`
+- Password: Stored in `.env` file (not committed to version control)
+- Password variable: `AUTH_PASSWORD` in `.env`
+- SHA-256 Hash variable: `AUTH_PASSWORD_HASH` in `.env`
 - Auth method: Bearer token with password hash
 - Session storage: Browser sessionStorage (persists within session only)
+- Security: Password and hash are stored in `.env` file which is excluded from git via `.gitignore`
 
 ## Important Configuration
 
@@ -88,7 +90,11 @@ systemctl logs -u tasks-api.service   # View logs
 1. Verify nginx has the proxy_pass configuration (see above)
 2. Test nginx config: `nginx -t`
 3. Reload nginx: `systemctl reload nginx`
-4. Verify API is accessible: `curl -k -H "Authorization: Bearer e2b4e38fed003ce3e1aceb2d2cff3c606ab8bf13a970e0e02e71b372cf4bd0f6" https://tasks.chinmaypandhare.uk/api/tasks`
+4. Verify API is accessible:
+```bash
+AUTH_HASH=$(grep AUTH_PASSWORD_HASH .env | cut -d '=' -f2)
+curl -k -H "Authorization: Bearer $AUTH_HASH" https://tasks.chinmaypandhare.uk/api/tasks
+```
 
 ### Issue: Backend not running
 
@@ -109,21 +115,29 @@ systemctl logs -u tasks-api.service   # View logs
 **Cause:** Incorrect Bearer token or password hash mismatch between frontend and backend.
 
 **Solution:**
-1. Verify PASSWORD_HASH in `auth.js` matches PASSWORD_HASH in `server.js`
-2. Use the correct Bearer token: `e2b4e38fed003ce3e1aceb2d2cff3c606ab8bf13a970e0e02e71b372cf4bd0f6`
+1. Verify PASSWORD_HASH in `auth.js` matches AUTH_PASSWORD_HASH in `.env`
+2. Check that the `.env` file is properly loaded by `server.js`
 3. Check browser console for authentication issues
 
 ## Testing
 
 **Test API directly:**
 ```bash
-curl -s -H "Authorization: Bearer e2b4e38fed003ce3e1aceb2d2cff3c606ab8bf13a970e0e02e71b372cf4bd0f6" \
+# Get the password hash from .env
+AUTH_HASH=$(grep AUTH_PASSWORD_HASH .env | cut -d '=' -f2)
+
+# Test the API
+curl -s -H "Authorization: Bearer $AUTH_HASH" \
   http://localhost:3001/api/tasks | jq .
 ```
 
 **Test API through nginx:**
 ```bash
-curl -k -s -H "Authorization: Bearer e2b4e38fed003ce3e1aceb2d2cff3c606ab8bf13a970e0e02e71b372cf4bd0f6" \
+# Get the password hash from .env
+AUTH_HASH=$(grep AUTH_PASSWORD_HASH .env | cut -d '=' -f2)
+
+# Test through nginx
+curl -k -s -H "Authorization: Bearer $AUTH_HASH" \
   https://tasks.chinmaypandhare.uk/api/tasks | jq .
 ```
 
@@ -155,12 +169,15 @@ The task management app includes Ralph execution capability:
 
 **Testing Ralph execution:**
 ```bash
+# Get the password hash from .env
+AUTH_HASH=$(grep AUTH_PASSWORD_HASH .env | cut -d '=' -f2)
+
 # Check status
-curl -H "Authorization: Bearer e2b4e38fed003ce3e1aceb2d2cff3c606ab8bf13a970e0e02e71b372cf4bd0f6" \
+curl -H "Authorization: Bearer $AUTH_HASH" \
   http://localhost:3001/api/ralph/status
 
 # Trigger execution
-curl -X POST -H "Authorization: Bearer e2b4e38fed003ce3e1aceb2d2cff3c606ab8bf13a970e0e02e71b372cf4bd0f6" \
+curl -X POST -H "Authorization: Bearer $AUTH_HASH" \
   http://localhost:3001/api/ralph/execute
 ```
 

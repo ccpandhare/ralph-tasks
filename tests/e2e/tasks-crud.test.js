@@ -1,3 +1,4 @@
+require('dotenv').config();
 const puppeteer = require('puppeteer');
 const fs = require('fs').promises;
 const path = require('path');
@@ -6,7 +7,7 @@ describe('Tasks CRUD Operations E2E Tests', () => {
   let browser;
   let page;
   const BASE_URL = process.env.TEST_URL || 'https://tasks.chinmaypandhare.uk';
-  const CORRECT_PASSWORD = '4wJkq5b6fmtuG3Nv1lHxJXYenULuE/j7dW1SksImqZ8=';
+  const CORRECT_PASSWORD = process.env.AUTH_PASSWORD;
 
   // Mock tasks file path (will be created in test environment)
   const MOCK_TASKS_FILE = path.join('/tmp', 'test-tasks.json');

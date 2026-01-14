@@ -1,10 +1,11 @@
+require('dotenv').config();
 const puppeteer = require('puppeteer');
 
 describe('Login Flow E2E Tests', () => {
   let browser;
   let page;
   const BASE_URL = process.env.TEST_URL || 'https://tasks.chinmaypandhare.uk';
-  const CORRECT_PASSWORD = '4wJkq5b6fmtuG3Nv1lHxJXYenULuE/j7dW1SksImqZ8=';
+  const CORRECT_PASSWORD = process.env.AUTH_PASSWORD;
   const INCORRECT_PASSWORD = 'wrongpassword123';
 
   beforeAll(async () => {

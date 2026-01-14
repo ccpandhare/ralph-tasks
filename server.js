@@ -1,12 +1,18 @@
+require('dotenv').config();
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const url = require('url');
 const { spawn } = require('child_process');
 
-// Hardcoded password hash for authentication (same as in auth.js)
-// Password: 4wJkq5b6fmtuG3Nv1lHxJXYenULuE/j7dW1SksImqZ8=
-const PASSWORD_HASH = "e2b4e38fed003ce3e1aceb2d2cff3c606ab8bf13a970e0e02e71b372cf4bd0f6";
+// Load password hash from environment variable
+const PASSWORD_HASH = process.env.AUTH_PASSWORD_HASH;
+
+if (!PASSWORD_HASH) {
+    console.error('ERROR: AUTH_PASSWORD_HASH environment variable is not set');
+    console.error('Please ensure .env file exists with AUTH_PASSWORD_HASH defined');
+    process.exit(1);
+}
 
 // Port configuration
 const PORT = process.env.PORT || 3001;

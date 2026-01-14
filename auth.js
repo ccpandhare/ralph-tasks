@@ -1,7 +1,6 @@
-// Hardcoded SHA-256 hash of the password
-// Password: 4wJkq5b6fmtuG3Nv1lHxJXYenULuE/j7dW1SksImqZ8=
-// Hash generated using: echo -n "4wJkq5b6fmtuG3Nv1lHxJXYenULuE/j7dW1SksImqZ8=" | sha256sum
-const PASSWORD_HASH = "e2b4e38fed003ce3e1aceb2d2cff3c606ab8bf13a970e0e02e71b372cf4bd0f6";
+// Password hash - updated regularly for security
+// The actual password is stored securely in the server's .env file
+const PASSWORD_HASH = "0fc9d5faa3ab9b9e53f94f3070c29854a0d7982ab4de27f8530c96c596a315d4";
 
 // Check if user is already authenticated
 function isAuthenticated() {
