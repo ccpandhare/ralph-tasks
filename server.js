@@ -5,13 +5,28 @@ const path = require('path');
 const url = require('url');
 const { spawn } = require('child_process');
 
-// Load password hash from environment variable
+// Load password hashes from environment variables
 const PASSWORD_HASH = process.env.AUTH_PASSWORD_HASH;
+const TEST_PASSWORD_HASH = process.env.TEST_AUTH_PASSWORD_HASH;
 
 if (!PASSWORD_HASH) {
     console.error('ERROR: AUTH_PASSWORD_HASH environment variable is not set');
     console.error('Please ensure .env file exists with AUTH_PASSWORD_HASH defined');
     process.exit(1);
+}
+
+// Helper function to get the correct file paths based on account type
+function getFilePaths(isTestAccount) {
+    if (isTestAccount) {
+        return {
+            tasksFile: TEST_TASKS_FILE,
+            projectsFile: TEST_PROJECTS_FILE
+        };
+    }
+    return {
+        tasksFile: TASKS_FILE,
+        projectsFile: PROJECTS_FILE
+    };
 }
 
 // Port configuration
@@ -22,20 +37,41 @@ const TASKS_FILE = '/var/main/tasks.json';
 const PROJECTS_FILE = '/var/main/projects.json';
 const LOGS_FILE = '/var/main/logs/progress.txt';
 
+// Test account files (in application directory, not production directory)
+const TEST_TASKS_FILE = path.join(__dirname, 'test-tasks.json');
+const TEST_PROJECTS_FILE = path.join(__dirname, 'test-projects.json');
+
 // Ralph execution tracking
 let ralphRunning = false;
 let ralphProcess = null;
 
-// Helper function to check authentication
-function isAuthenticated(req) {
+// Helper function to check authentication and determine account type
+function getAuthInfo(req) {
     const authHeader = req.headers['authorization'];
-    if (!authHeader) return false;
+    if (!authHeader) return { authenticated: false, isTestAccount: false };
 
     // Expect format: "Bearer <password_hash>"
     const parts = authHeader.split(' ');
-    if (parts.length !== 2 || parts[0] !== 'Bearer') return false;
+    if (parts.length !== 2 || parts[0] !== 'Bearer') return { authenticated: false, isTestAccount: false };
 
-    return parts[1] === PASSWORD_HASH;
+    const token = parts[1];
+
+    // Check if it's the test account
+    if (TEST_PASSWORD_HASH && token === TEST_PASSWORD_HASH) {
+        return { authenticated: true, isTestAccount: true };
+    }
+
+    // Check if it's the production account
+    if (token === PASSWORD_HASH) {
+        return { authenticated: true, isTestAccount: false };
+    }
+
+    return { authenticated: false, isTestAccount: false };
+}
+
+// Legacy helper for backward compatibility
+function isAuthenticated(req) {
+    return getAuthInfo(req).authenticated;
 }
 
 // Helper function to send JSON response
@@ -73,13 +109,17 @@ const server = http.createServer((req, res) => {
     // API endpoint: GET /api/tasks
     if (pathname === '/api/tasks' && req.method === 'GET') {
         // Check authentication
-        if (!isAuthenticated(req)) {
+        const authInfo = getAuthInfo(req);
+        if (!authInfo.authenticated) {
             sendError(res, 401, 'Unauthorized: Invalid or missing authentication token');
             return;
         }
 
-        // Read tasks.json
-        fs.readFile(TASKS_FILE, 'utf8', (err, data) => {
+        // Get file path based on account type
+        const { tasksFile } = getFilePaths(authInfo.isTestAccount);
+
+        // Read tasks from appropriate file
+        fs.readFile(tasksFile, 'utf8', (err, data) => {
             if (err) {
                 console.error('Error reading tasks.json:', err);
                 sendError(res, 500, 'Failed to read tasks file');
@@ -100,13 +140,17 @@ const server = http.createServer((req, res) => {
     // API endpoint: GET /api/projects
     if (pathname === '/api/projects' && req.method === 'GET') {
         // Check authentication
-        if (!isAuthenticated(req)) {
+        const authInfo = getAuthInfo(req);
+        if (!authInfo.authenticated) {
             sendError(res, 401, 'Unauthorized: Invalid or missing authentication token');
             return;
         }
 
-        // Read projects.json
-        fs.readFile(PROJECTS_FILE, 'utf8', (err, data) => {
+        // Get file path based on account type
+        const { projectsFile } = getFilePaths(authInfo.isTestAccount);
+
+        // Read projects from appropriate file
+        fs.readFile(projectsFile, 'utf8', (err, data) => {
             if (err) {
                 console.error('Error reading projects.json:', err);
                 sendError(res, 500, 'Failed to read projects file');
@@ -127,7 +171,8 @@ const server = http.createServer((req, res) => {
     // API endpoint: POST /api/tasks
     if (pathname === '/api/tasks' && req.method === 'POST') {
         // Check authentication
-        if (!isAuthenticated(req)) {
+        const authInfo = getAuthInfo(req);
+        if (!authInfo.authenticated) {
             sendError(res, 401, 'Unauthorized: Invalid or missing authentication token');
             return;
         }
@@ -154,8 +199,11 @@ const server = http.createServer((req, res) => {
                     return;
                 }
 
-                // Read existing tasks
-                fs.readFile(TASKS_FILE, 'utf8', (err, data) => {
+                // Get file path based on account type
+                const { tasksFile } = getFilePaths(authInfo.isTestAccount);
+
+                // Read existing tasks from appropriate file
+                fs.readFile(tasksFile, 'utf8', (err, data) => {
                     if (err) {
                         console.error('Error reading tasks.json:', err);
                         sendError(res, 500, 'Failed to read tasks file');
@@ -176,7 +224,7 @@ const server = http.createServer((req, res) => {
                         tasksData.tasks.push(newTask);
 
                         // Write atomically using temporary file
-                        const tmpFile = TASKS_FILE + '.tmp';
+                        const tmpFile = tasksFile + '.tmp';
                         const jsonContent = JSON.stringify(tasksData, null, 2) + '\n';
 
                         fs.writeFile(tmpFile, jsonContent, 'utf8', (writeErr) => {
@@ -187,7 +235,7 @@ const server = http.createServer((req, res) => {
                             }
 
                             // Atomically rename temp file to actual file
-                            fs.rename(tmpFile, TASKS_FILE, (renameErr) => {
+                            fs.rename(tmpFile, tasksFile, (renameErr) => {
                                 if (renameErr) {
                                     console.error('Error renaming temp file:', renameErr);
                                     // Clean up temp file
@@ -217,7 +265,8 @@ const server = http.createServer((req, res) => {
     // API endpoint: PUT /api/tasks/:taskId
     if (pathname.startsWith('/api/tasks/') && req.method === 'PUT') {
         // Check authentication
-        if (!isAuthenticated(req)) {
+        const authInfo = getAuthInfo(req);
+        if (!authInfo.authenticated) {
             sendError(res, 401, 'Unauthorized: Invalid or missing authentication token');
             return;
         }
@@ -235,8 +284,11 @@ const server = http.createServer((req, res) => {
             try {
                 const updateData = JSON.parse(body);
 
-                // Read existing tasks
-                fs.readFile(TASKS_FILE, 'utf8', (err, data) => {
+                // Get file path based on account type
+                const { tasksFile } = getFilePaths(authInfo.isTestAccount);
+
+                // Read existing tasks from appropriate file
+                fs.readFile(tasksFile, 'utf8', (err, data) => {
                     if (err) {
                         console.error('Error reading tasks.json:', err);
                         sendError(res, 500, 'Failed to read tasks file');
@@ -263,7 +315,7 @@ const server = http.createServer((req, res) => {
                         }
 
                         // Write atomically using temporary file
-                        const tmpFile = TASKS_FILE + '.tmp';
+                        const tmpFile = tasksFile + '.tmp';
                         const jsonContent = JSON.stringify(tasksData, null, 2) + '\n';
 
                         fs.writeFile(tmpFile, jsonContent, 'utf8', (writeErr) => {
@@ -274,7 +326,7 @@ const server = http.createServer((req, res) => {
                             }
 
                             // Atomically rename temp file to actual file
-                            fs.rename(tmpFile, TASKS_FILE, (renameErr) => {
+                            fs.rename(tmpFile, tasksFile, (renameErr) => {
                                 if (renameErr) {
                                     console.error('Error renaming temp file:', renameErr);
                                     // Clean up temp file
@@ -296,6 +348,80 @@ const server = http.createServer((req, res) => {
                 console.error('Error parsing request body:', parseErr);
                 sendError(res, 400, 'Invalid JSON in request body');
             }
+        });
+
+        return;
+    }
+
+    // API endpoint: POST /api/test/reset (test account only)
+    if (pathname === '/api/test/reset' && req.method === 'POST') {
+        // Check authentication - must be test account
+        const authInfo = getAuthInfo(req);
+        if (!authInfo.authenticated || !authInfo.isTestAccount) {
+            sendError(res, 403, 'Forbidden: This endpoint is only available for test accounts');
+            return;
+        }
+
+        // Define initial test data
+        const initialTasksData = {
+            version: "1.0",
+            tasks: [
+                {
+                    id: "test-001",
+                    project: "test-project",
+                    title: "Test Task 1",
+                    requirements: ["Requirement 1", "Requirement 2"],
+                    status: false,
+                    completed: false,
+                    created: "2026-01-12",
+                    notes: "Test notes"
+                },
+                {
+                    id: "test-002",
+                    project: "test-project",
+                    title: "Test Task 2",
+                    requirements: ["Requirement A", "Requirement B"],
+                    status: true,
+                    completed: false,
+                    created: "2026-01-12",
+                    notes: ""
+                },
+                {
+                    id: "test-003",
+                    project: "test-project",
+                    title: "Completed Test Task",
+                    requirements: ["Requirement X"],
+                    status: true,
+                    completed: true,
+                    created: "2026-01-11",
+                    notes: ""
+                }
+            ]
+        };
+
+        const initialProjectsData = {
+            projects: [
+                { id: "test-project", name: "Test Project" }
+            ]
+        };
+
+        // Reset test data files
+        fs.writeFile(TEST_TASKS_FILE, JSON.stringify(initialTasksData, null, 2) + '\n', 'utf8', (err) => {
+            if (err) {
+                console.error('Error resetting test tasks file:', err);
+                sendError(res, 500, 'Failed to reset test tasks file');
+                return;
+            }
+
+            fs.writeFile(TEST_PROJECTS_FILE, JSON.stringify(initialProjectsData, null, 2) + '\n', 'utf8', (err2) => {
+                if (err2) {
+                    console.error('Error resetting test projects file:', err2);
+                    sendError(res, 500, 'Failed to reset test projects file');
+                    return;
+                }
+
+                sendJSON(res, 200, { success: true, message: 'Test data reset successfully' });
+            });
         });
 
         return;

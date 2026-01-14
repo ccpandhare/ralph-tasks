@@ -6,7 +6,7 @@ describe('Logs Viewer E2E Tests', () => {
   let browser;
   let page;
   const BASE_URL = process.env.TEST_URL || 'https://tasks.chinmaypandhare.uk';
-  const CORRECT_PASSWORD = process.env.AUTH_PASSWORD;
+  const TEST_PASSWORD = process.env.TEST_AUTH_PASSWORD;
 
   // Mock logs content for testing
   const mockLogsContent = `# Ralph Progress Log
@@ -43,7 +43,7 @@ Started: Sun 11 Jan 05:21:15 UTC 2026
     });
 
     await page.waitForSelector('#password');
-    await page.type('#password', CORRECT_PASSWORD);
+    await page.type('#password', TEST_PASSWORD);
 
     await Promise.all([
       page.waitForNavigation({ waitUntil: 'networkidle0' }),

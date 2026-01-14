@@ -8,3 +8,6 @@ yarn-error.log*
 .env
 .env.local
 .env.*.local
+test-tasks.json
+test-projects.json
+test-*.json.tmp

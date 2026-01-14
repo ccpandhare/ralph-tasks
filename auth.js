@@ -1,6 +1,7 @@
-// Password hash - updated regularly for security
-// The actual password is stored securely in the server's .env file
+// Password hashes - updated regularly for security
+// The actual passwords are stored securely in the server's .env file
 const PASSWORD_HASH = "0fc9d5faa3ab9b9e53f94f3070c29854a0d7982ab4de27f8530c96c596a315d4";
+const TEST_PASSWORD_HASH = "709dd3e8bf11b4a56227095a635ddf42a3da473f8db0441f7c01e24c671dd60d"; // Test account for E2E tests
 
 // Check if user is already authenticated
 function isAuthenticated() {
@@ -38,9 +39,11 @@ if (document.getElementById('loginForm')) {
         // Hash the entered password
         const hashedPassword = await sha256(password);
 
-        // Verify password
-        if (hashedPassword === PASSWORD_HASH) {
+        // Verify password (check both production and test accounts)
+        if (hashedPassword === PASSWORD_HASH || hashedPassword === TEST_PASSWORD_HASH) {
             setAuthenticated(true);
+            // Store which account type for API calls
+            sessionStorage.setItem('authToken', hashedPassword);
             window.location.href = 'index.html';
         } else {
             errorMessage.textContent = 'Incorrect password. Please try again.';
@@ -53,7 +56,8 @@ if (document.getElementById('loginForm')) {
 // Get authentication token for API requests
 function getAuthToken() {
     if (!isAuthenticated()) return null;
-    return PASSWORD_HASH;
+    // Return the actual token that was used to login (stored in sessionStorage)
+    return sessionStorage.getItem('authToken') || PASSWORD_HASH;
 }
 
 // Redirect to login if not authenticated (for protected pages)

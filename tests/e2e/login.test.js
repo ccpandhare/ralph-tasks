@@ -5,8 +5,8 @@ describe('Login Flow E2E Tests', () => {
   let browser;
   let page;
   const BASE_URL = process.env.TEST_URL || 'https://tasks.chinmaypandhare.uk';
-  const CORRECT_PASSWORD = process.env.AUTH_PASSWORD;
-  const INCORRECT_PASSWORD = 'wrongpassword123';
+  const TEST_PASSWORD = process.env.TEST_AUTH_PASSWORD;
+  const INTEST_PASSWORD = 'wrongpassword123';
 
   beforeAll(async () => {
     // Launch browser in headless mode for CI/CD
@@ -64,7 +64,7 @@ describe('Login Flow E2E Tests', () => {
 
     // Fill in the password field
     await page.waitForSelector('#password');
-    await page.type('#password', CORRECT_PASSWORD);
+    await page.type('#password', TEST_PASSWORD);
 
     // Submit the form
     await Promise.all([
@@ -87,7 +87,7 @@ describe('Login Flow E2E Tests', () => {
 
     // Fill in and submit the form
     await page.waitForSelector('#password');
-    await page.type('#password', CORRECT_PASSWORD);
+    await page.type('#password', TEST_PASSWORD);
 
     await Promise.all([
       page.waitForNavigation({ waitUntil: 'networkidle0' }),
@@ -113,7 +113,7 @@ describe('Login Flow E2E Tests', () => {
 
     // Fill in incorrect password
     await page.waitForSelector('#password');
-    await page.type('#password', INCORRECT_PASSWORD);
+    await page.type('#password', INTEST_PASSWORD);
 
     // Submit the form
     await page.click('button[type="submit"]');
@@ -144,7 +144,7 @@ describe('Login Flow E2E Tests', () => {
 
     // Fill in incorrect password
     await page.waitForSelector('#password');
-    await page.type('#password', INCORRECT_PASSWORD);
+    await page.type('#password', INTEST_PASSWORD);
 
     // Submit the form
     await page.click('button[type="submit"]');
@@ -167,7 +167,7 @@ describe('Login Flow E2E Tests', () => {
     });
 
     await page.waitForSelector('#password');
-    await page.type('#password', CORRECT_PASSWORD);
+    await page.type('#password', TEST_PASSWORD);
 
     await Promise.all([
       page.waitForNavigation({ waitUntil: 'networkidle0' }),
@@ -207,7 +207,7 @@ describe('Login Flow E2E Tests', () => {
     });
 
     await page.waitForSelector('#password');
-    await page.type('#password', CORRECT_PASSWORD);
+    await page.type('#password', TEST_PASSWORD);
 
     await Promise.all([
       page.waitForNavigation({ waitUntil: 'networkidle0' }),
@@ -238,7 +238,7 @@ describe('Login Flow E2E Tests', () => {
     });
 
     await page.waitForSelector('#password');
-    await page.type('#password', CORRECT_PASSWORD);
+    await page.type('#password', TEST_PASSWORD);
 
     await Promise.all([
       page.waitForNavigation({ waitUntil: 'networkidle0' }),
