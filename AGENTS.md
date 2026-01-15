@@ -214,10 +214,20 @@ npm run test:e2e      # Run only e2e tests
 
 1. Make code changes in `/var/www/tasks.chinmaypandhare.uk`
 2. Test locally (ensure server is running)
-3. Restart systemd service if backend changed: `systemctl restart tasks-api.service`
-4. Reload nginx if config changed: `systemctl reload nginx`
-5. Run e2e tests: `npm run test:e2e`
-6. Verify in browser at https://tasks.chinmaypandhare.uk
+3. Restart systemd service if backend changed: `sudo systemctl restart tasks-api.service`
+4. Reload nginx if config changed: `sudo systemctl reload nginx`
+5. Run e2e tests: `npm run test:e2e` (optional - can skip if just ran)
+6. Commit changes:
+   ```bash
+   git add <files>
+   git commit -m "commit message"
+   ```
+7. Push to GitHub: `git push origin master`
+8. Verify deployment at https://tasks.chinmaypandhare.uk
+
+**GitHub Repository:** `ccpandhare/ralph-tasks`
+
+**Note:** The application is deployed directly from `/var/www/tasks.chinmaypandhare.uk`. Changes are live immediately after server restart. Git push is for version control and backup.
 
 ## Ralph Execution
 
