@@ -400,9 +400,17 @@ const server = http.createServer((req, res) => {
         };
 
         const initialProjectsData = {
-            projects: [
-                { id: "test-project", name: "Test Project" }
-            ]
+            version: "1.0",
+            projects: {
+                "test-project": {
+                    name: "test-project",
+                    location: "/tmp/test-project",
+                    description: "Test Project",
+                    type: "test",
+                    active: true,
+                    deploy_on_completion: false
+                }
+            }
         };
 
         // Reset test data files

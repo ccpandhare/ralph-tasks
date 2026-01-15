@@ -41,6 +41,39 @@ This is a task management web application that displays and manages tasks from `
 
 ## Important Configuration
 
+### File Permissions and Ownership
+
+The Node.js backend runs as the `www-data` user (configured in systemd service). File permissions must be configured to allow proper read/write access:
+
+**Production Data (Read-Write for www-data):**
+- `/var/main/tasks.json` - Must be writable by `www-data` for task CRUD operations
+- `/var/main/projects.json` - Must be readable by `www-data` (currently read-only is acceptable)
+- `/var/main/` directory - Must allow `www-data` to create `.tmp` files for atomic writes
+
+**Test Data (Read-Write for www-data):**
+- `/var/www/tasks.chinmaypandhare.uk/test-tasks.json` - Must be writable by `www-data`
+- `/var/www/tasks.chinmaypandhare.uk/test-projects.json` - Must be writable by `www-data`
+- Application directory - Must allow `www-data` to create `.tmp` files for atomic writes
+
+**Required Permissions Summary:**
+```bash
+# Application directory - must allow www-data to create .tmp files
+drwxrwxr-x root www-data /var/www/tasks.chinmaypandhare.uk
+
+# Test data files - must be writable by www-data
+-rw-rw-r-- www-data www-data test-tasks.json
+-rw-rw-r-- www-data www-data test-projects.json
+
+# Production directory - must allow www-data to create .tmp files
+drwxrwxr-x root www-data /var/main
+
+# Production data files - must be writable by www-data
+-rw-rw-r-- root www-data /var/main/tasks.json
+-rw-rw-r-- root www-data /var/main/projects.json
+```
+
+**Note:** The server uses atomic writes (write to `.tmp` file, then rename) which requires write permission to both the directory and the files.
+
 ### Nginx Proxy Setup
 
 The nginx configuration MUST include the `/api/` proxy pass to the Node.js backend:
@@ -121,6 +154,8 @@ curl -k -H "Authorization: Bearer $AUTH_HASH" https://tasks.chinmaypandhare.uk/a
 
 ## Testing
 
+### API Testing
+
 **Test API directly:**
 ```bash
 # Get the password hash from .env
@@ -147,13 +182,42 @@ tail -f /var/log/nginx/tasks.chinmaypandhare.uk.access.log
 tail -f /var/log/nginx/tasks.chinmaypandhare.uk.error.log
 ```
 
+### End-to-End Testing
+
+**Framework:** Puppeteer + Jest
+
+**Run tests:**
+```bash
+npm test              # Run all tests
+npm run test:e2e      # Run only e2e tests
+```
+
+**Test Files:**
+- `tests/e2e/login.test.js` - Authentication flow (8 tests)
+- `tests/e2e/tasks-crud.test.js` - Task CRUD operations (8 tests)
+- `tests/e2e/logs.test.js` - Logs viewer functionality (10 tests)
+
+**Test Account:**
+- Uses `TEST_AUTH_PASSWORD` and `TEST_AUTH_PASSWORD_HASH` from `.env`
+- Runs against **in-memory mock data** (does not modify `/var/main/tasks.json`)
+- Isolated from production data for safe testing
+
+**Coverage:**
+- Login/logout flows with authentication
+- Task creation, reading, updating (mark complete)
+- Task filtering (open/completed views)
+- Form validation
+- Logs viewer with filtering and auto-refresh
+- Mobile/tablet responsiveness
+
 ## Deployment Workflow
 
 1. Make code changes in `/var/www/tasks.chinmaypandhare.uk`
 2. Test locally (ensure server is running)
 3. Restart systemd service if backend changed: `systemctl restart tasks-api.service`
 4. Reload nginx if config changed: `systemctl reload nginx`
-5. Verify in browser at https://tasks.chinmaypandhare.uk
+5. Run e2e tests: `npm run test:e2e`
+6. Verify in browser at https://tasks.chinmaypandhare.uk
 
 ## Ralph Execution
 
@@ -189,3 +253,4 @@ curl -X POST -H "Authorization: Bearer $AUTH_HASH" \
 - Nginx config: `/etc/nginx/sites-available/tasks.chinmaypandhare.uk`
 - Systemd service: `/etc/systemd/system/tasks-api.service`
 - Ralph script: `/var/main/scripts/ralph-once.sh`
+- E2E tests: `/var/www/tasks.chinmaypandhare.uk/tests/e2e/`

@@ -66,6 +66,9 @@ describe('Tasks CRUD Operations E2E Tests', () => {
   });
 
   beforeEach(async () => {
+    // Reset test data before each test to ensure isolation
+    await resetTestData();
+
     page = await browser.newPage();
     await page.goto(`${BASE_URL}/login.html`, { waitUntil: 'networkidle0' });
     await page.evaluate(() => sessionStorage.clear());
@@ -184,28 +187,41 @@ describe('Tasks CRUD Operations E2E Tests', () => {
     // Wait for API response
     const response = await responsePromise;
     const responseStatus = response.status();
+    const responseData = await response.json();
     console.log(`Create task API response status: ${responseStatus}`);
 
-    if (responseStatus === 201) {
-      // Wait for success message
-      await page.waitForSelector('#successMessage', {
-        visible: true,
-        timeout: 10000
-      });
+    // Task creation should succeed (201) in test environment
+    expect(responseStatus).toBe(201);
+    expect(responseData.success).toBe(true);
+    expect(responseData.task).toBeDefined();
 
-      const successMessage = await page.$eval('#successMessage', el => el.textContent);
-      expect(successMessage).toContain('created successfully');
+    // Wait for success message
+    await page.waitForSelector('#successMessage', {
+      visible: true,
+      timeout: 10000
+    });
 
-      console.log('✓ Successfully created new task via form');
-      console.log('✓ Task created in test account (in-memory mock data)');
-    } else {
-      // API returned an error (likely permissions issue)
-      console.log(`⚠ API returned status ${responseStatus} - likely a permission issue`);
-      console.log('✓ Create task form submits correctly (server permissions required for persistence)');
+    const successMessage = await page.$eval('#successMessage', el => el.textContent);
+    expect(successMessage).toContain('created successfully');
 
-      // Verify the API was called
-      expect([201, 400, 500]).toContain(responseStatus);
-    }
+    // Verify the task was actually persisted by fetching all tasks
+    const verifyResponse = await fetch(`${BASE_URL}/api/tasks`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${process.env.TEST_AUTH_PASSWORD_HASH}`
+      }
+    });
+    expect(verifyResponse.ok).toBe(true);
+
+    const tasksData = await verifyResponse.json();
+    const createdTask = tasksData.tasks.find(t => t.title === 'New E2E Test Task');
+    expect(createdTask).toBeDefined();
+    expect(createdTask.requirements).toContain('E2E Test Requirement 1');
+    expect(createdTask.requirements).toContain('E2E Test Requirement 2');
+    expect(createdTask.notes).toBe('Created via E2E test');
+
+    console.log('✓ Successfully created new task via form');
+    console.log('✓ Task persisted to test data file and verified');
   }, 60000);
 
   test('should update task status (mark as complete)', async () => {
@@ -250,30 +266,39 @@ describe('Tasks CRUD Operations E2E Tests', () => {
     // Wait for the API response
     const response = await responsePromise;
     const responseStatus = response.status();
+    const responseData = await response.json();
     console.log(`API response status: ${responseStatus}`);
 
-    if (responseStatus === 200) {
-      // Wait for success message
-      await page.waitForSelector('.message-container', {
-        visible: true,
-        timeout: 10000
-      });
+    // Task update should succeed (200) in test environment
+    expect(responseStatus).toBe(200);
+    expect(responseData.success).toBe(true);
 
-      // Wait for the task list to refresh
-      await new Promise(resolve => setTimeout(resolve, 1000));
+    // Wait for success message
+    await page.waitForSelector('.message-container', {
+      visible: true,
+      timeout: 10000
+    });
 
-      console.log(`✓ Successfully marked task ${taskId} as complete`);
-      console.log('✓ Task update completed in test account (in-memory mock data)');
-    } else {
-      // API returned an error (likely permissions issue writing to /var/main/tasks.json)
-      console.log(`⚠ API returned status ${responseStatus} - likely a permission issue`);
-      console.log('✓ Update API endpoint exists and responds (permissions need to be configured)');
+    // Wait for the task list to refresh
+    await new Promise(resolve => setTimeout(resolve, 1000));
 
-      // Verify the API endpoint was called correctly
-      expect(responseStatus).toBeGreaterThanOrEqual(400);
+    // Verify the task was actually updated by fetching it again
+    const verifyResponse = await fetch(`${BASE_URL}/api/tasks`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${process.env.TEST_AUTH_PASSWORD_HASH}`
+      }
+    });
+    expect(verifyResponse.ok).toBe(true);
 
-      console.log('✓ Task update functionality tested (server permissions required for full functionality)');
-    }
+    const tasksData = await verifyResponse.json();
+    const updatedTask = tasksData.tasks.find(t => t.id === taskId);
+    expect(updatedTask).toBeDefined();
+    expect(updatedTask.completed).toBe(true);
+    expect(updatedTask.status).toBe(true);
+
+    console.log(`✓ Successfully marked task ${taskId} as complete`);
+    console.log('✓ Task update persisted to test data file and verified');
   }, 60000);
 
   test('should switch between open and completed tasks views', async () => {
