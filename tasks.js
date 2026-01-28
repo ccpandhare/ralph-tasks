@@ -390,10 +390,12 @@ async function executeRalph() {
         }
 
         const data = await response.json();
-        showMessage('Ralph execution started! Status will be updated automatically.', 'success');
+        showMessage('Ralph execution started! Redirecting to execution logs...', 'success');
 
-        // Start polling for status
-        startRalphStatusPolling();
+        // Redirect to Ralph logs page after a short delay
+        setTimeout(() => {
+            window.location.href = 'ralph-logs.html';
+        }, 1000);
     } catch (error) {
         console.error('Error starting Ralph:', error);
         showMessage(`Error: ${error.message}`, 'error');

@@ -44,6 +44,7 @@ const TEST_PROJECTS_FILE = path.join(__dirname, 'test-projects.json');
 // Ralph execution tracking
 let ralphRunning = false;
 let ralphProcess = null;
+let currentRalphLogFile = null;
 
 // Helper function to check authentication and determine account type
 function getAuthInfo(req) {
@@ -452,6 +453,21 @@ const server = http.createServer((req, res) => {
         // Mark Ralph as running
         ralphRunning = true;
 
+        // Create a log file for this Ralph execution
+        const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+        const ralphLogsDir = '/var/main/logs/ralph-runs';
+        const currentLogFile = path.join(ralphLogsDir, `ralph-${timestamp}.log`);
+        currentRalphLogFile = currentLogFile;
+
+        // Ensure the logs directory exists
+        if (!fs.existsSync(ralphLogsDir)) {
+            fs.mkdirSync(ralphLogsDir, { recursive: true });
+        }
+
+        // Create the log file with header
+        const logHeader = `Ralph Execution Log\nStarted: ${new Date().toISOString()}\n${'='.repeat(80)}\n\n`;
+        fs.writeFileSync(currentLogFile, logHeader);
+
         // Execute ralph-once.sh
         const ralphScript = '/var/main/scripts/ralph-once.sh';
         ralphProcess = spawn('bash', [ralphScript], {
@@ -463,16 +479,25 @@ const server = http.createServer((req, res) => {
         let errorOutput = '';
 
         ralphProcess.stdout.on('data', (data) => {
-            output += data.toString();
+            const text = data.toString();
+            output += text;
+            // Stream to log file in real-time
+            fs.appendFileSync(currentLogFile, text);
         });
 
         ralphProcess.stderr.on('data', (data) => {
-            errorOutput += data.toString();
+            const text = data.toString();
+            errorOutput += text;
+            // Stream to log file in real-time with [STDERR] prefix
+            fs.appendFileSync(currentLogFile, `[STDERR] ${text}`);
         });
 
         ralphProcess.on('close', (code) => {
             ralphRunning = false;
             ralphProcess = null;
+            const footer = `\n${'='.repeat(80)}\nCompleted: ${new Date().toISOString()}\nExit Code: ${code}\n`;
+            fs.appendFileSync(currentLogFile, footer);
+            currentRalphLogFile = null;
             console.log(`Ralph execution completed with code ${code}`);
             if (code !== 0) {
                 console.error('Ralph error output:', errorOutput);
@@ -482,6 +507,9 @@ const server = http.createServer((req, res) => {
         ralphProcess.on('error', (err) => {
             ralphRunning = false;
             ralphProcess = null;
+            const errorMsg = `\n[ERROR] Ralph process error: ${err.message}\n`;
+            fs.appendFileSync(currentLogFile, errorMsg);
+            currentRalphLogFile = null;
             console.error('Ralph process error:', err);
         });
 
@@ -504,8 +532,133 @@ const server = http.createServer((req, res) => {
 
         sendJSON(res, 200, {
             running: ralphRunning,
-            status: ralphRunning ? 'running' : 'idle'
+            status: ralphRunning ? 'running' : 'idle',
+            currentLogFile: currentRalphLogFile
         });
+        return;
+    }
+
+    // API endpoint: GET /api/ralph/current-log
+    if (pathname === '/api/ralph/current-log' && req.method === 'GET') {
+        // Check authentication
+        if (!isAuthenticated(req)) {
+            sendError(res, 401, 'Unauthorized: Invalid or missing authentication token');
+            return;
+        }
+
+        // Return the current Ralph execution log if running, or the most recent log
+        let logFile = currentRalphLogFile;
+
+        if (!logFile) {
+            // Find the most recent log file
+            const ralphLogsDir = '/var/main/logs/ralph-runs';
+            if (fs.existsSync(ralphLogsDir)) {
+                const files = fs.readdirSync(ralphLogsDir)
+                    .filter(f => f.startsWith('ralph-') && f.endsWith('.log'))
+                    .map(f => ({
+                        name: f,
+                        path: path.join(ralphLogsDir, f),
+                        time: fs.statSync(path.join(ralphLogsDir, f)).mtime.getTime()
+                    }))
+                    .sort((a, b) => b.time - a.time);
+
+                if (files.length > 0) {
+                    logFile = files[0].path;
+                }
+            }
+        }
+
+        if (!logFile || !fs.existsSync(logFile)) {
+            sendJSON(res, 200, {
+                content: '',
+                isRunning: ralphRunning,
+                message: 'No Ralph execution logs available yet'
+            });
+            return;
+        }
+
+        try {
+            const content = fs.readFileSync(logFile, 'utf-8');
+            sendJSON(res, 200, {
+                content: content,
+                isRunning: ralphRunning,
+                logFile: path.basename(logFile)
+            });
+        } catch (err) {
+            sendError(res, 500, `Failed to read log file: ${err.message}`);
+        }
+        return;
+    }
+
+    // API endpoint: GET /api/ralph/log-history
+    if (pathname === '/api/ralph/log-history' && req.method === 'GET') {
+        // Check authentication
+        if (!isAuthenticated(req)) {
+            sendError(res, 401, 'Unauthorized: Invalid or missing authentication token');
+            return;
+        }
+
+        const ralphLogsDir = '/var/main/logs/ralph-runs';
+
+        if (!fs.existsSync(ralphLogsDir)) {
+            sendJSON(res, 200, { logs: [] });
+            return;
+        }
+
+        try {
+            const files = fs.readdirSync(ralphLogsDir)
+                .filter(f => f.startsWith('ralph-') && f.endsWith('.log'))
+                .map(f => {
+                    const filePath = path.join(ralphLogsDir, f);
+                    const stats = fs.statSync(filePath);
+                    return {
+                        name: f,
+                        path: filePath,
+                        timestamp: stats.mtime.toISOString(),
+                        size: stats.size
+                    };
+                })
+                .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+
+            sendJSON(res, 200, { logs: files });
+        } catch (err) {
+            sendError(res, 500, `Failed to read log directory: ${err.message}`);
+        }
+        return;
+    }
+
+    // API endpoint: GET /api/ralph/log/:filename
+    if (pathname.startsWith('/api/ralph/log/') && req.method === 'GET') {
+        // Check authentication
+        if (!isAuthenticated(req)) {
+            sendError(res, 401, 'Unauthorized: Invalid or missing authentication token');
+            return;
+        }
+
+        const filename = pathname.replace('/api/ralph/log/', '');
+        const ralphLogsDir = '/var/main/logs/ralph-runs';
+        const logFile = path.join(ralphLogsDir, filename);
+
+        // Security check: ensure the file is within the logs directory
+        if (!logFile.startsWith(ralphLogsDir)) {
+            sendError(res, 403, 'Access denied');
+            return;
+        }
+
+        if (!fs.existsSync(logFile)) {
+            sendError(res, 404, 'Log file not found');
+            return;
+        }
+
+        try {
+            const content = fs.readFileSync(logFile, 'utf-8');
+            sendJSON(res, 200, {
+                content: content,
+                filename: filename
+            });
+        } catch (err) {
+            sendError(res, 500, `Failed to read log file: ${err.message}`);
+        }
         return;
     }
 

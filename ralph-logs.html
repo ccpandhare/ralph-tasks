@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Ralph Execution Logs Viewer">
+    <meta name="author" content="Chinmay Pandhare">
+    <title>Ralph Execution Logs</title>
+    <link rel="stylesheet" href="style.css">
+    <style>
+        .ralph-logs-container {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .logs-controls {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .log-viewer {
+            background: #1e1e1e;
+            color: #d4d4d4;
+            padding: 20px;
+            border-radius: 10px;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+            line-height: 1.6;
+            max-height: 70vh;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+        }
+
+        .log-viewer.live {
+            border: 2px solid #28a745;
+        }
+
+        .log-header {
+            color: #569cd6;
+            font-weight: bold;
+        }
+
+        .log-stderr {
+            color: #f48771;
+        }
+
+        .log-success {
+            color: #4ec9b0;
+        }
+
+        .log-error {
+            color: #f48771;
+            font-weight: bold;
+        }
+
+        .log-timestamp {
+            color: #9cdcfe;
+        }
+
+        .history-list {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .history-item {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            border-left: 4px solid #667eea;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .history-item:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.2);
+        }
+
+        .history-item.active {
+            border-left-color: #28a745;
+            background: #f0f9ff;
+        }
+
+        .history-item-name {
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 5px;
+        }
+
+        .history-item-meta {
+            font-size: 12px;
+            color: #666;
+        }
+
+        .status-badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 600;
+            margin-left: 10px;
+        }
+
+        .status-badge.running {
+            background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+            color: white;
+            animation: pulse 2s infinite;
+        }
+
+        .status-badge.stopped {
+            background: #6c757d;
+            color: white;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+
+        .toggle-container {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .toggle {
+            position: relative;
+            display: inline-block;
+            width: 50px;
+            height: 26px;
+        }
+
+        .toggle input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .toggle-slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #ccc;
+            transition: .4s;
+            border-radius: 26px;
+        }
+
+        .toggle-slider:before {
+            position: absolute;
+            content: "";
+            height: 18px;
+            width: 18px;
+            left: 4px;
+            bottom: 4px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+
+        .toggle input:checked + .toggle-slider {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+
+        .toggle input:checked + .toggle-slider:before {
+            transform: translateX(24px);
+        }
+
+        @media (max-width: 768px) {
+            .logs-controls {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .log-viewer {
+                font-size: 11px;
+                padding: 15px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="container header-content">
+            <h1>Ralph Execution Logs</h1>
+            <button id="logoutBtn" class="btn btn-secondary" onclick="logout()">Logout</button>
+        </div>
+    </header>
+
+    <main class="container">
+        <div class="content-area ralph-logs-container">
+            <div class="page-header">
+                <button onclick="window.location.href='index.html'" class="btn btn-secondary">← Back to Tasks</button>
+            </div>
+
+            <div class="logs-controls">
+                <div class="toggle-container">
+                    <label class="toggle">
+                        <input type="checkbox" id="autoRefreshToggle">
+                        <span class="toggle-slider"></span>
+                    </label>
+                    <label for="autoRefreshToggle">Auto-refresh (3s)</label>
+                </div>
+                <button id="refreshBtn" class="btn btn-secondary" onclick="refreshCurrentLog()">🔄 Refresh</button>
+                <button id="toggleHistoryBtn" class="btn btn-secondary" onclick="toggleHistory()">📂 Show History</button>
+                <span id="statusIndicator"></span>
+            </div>
+
+            <div id="historyPanel" style="display: none;">
+                <h3>Log History</h3>
+                <div id="historyList" class="history-list">
+                    <p class="loading">Loading log history...</p>
+                </div>
+            </div>
+
+            <div>
+                <h3 id="currentLogTitle">Current Execution Log</h3>
+                <div id="logViewer" class="log-viewer">
+                    <p class="loading">Loading logs...</p>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script src="auth.js"></script>
+    <script src="ralph-logs.js"></script>
+</body>
+</html>
