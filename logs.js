@@ -1,7 +1,13 @@
 // Global state
 let rawLogs = '';
+let allLogSections = []; // Store all loaded sections
 let autoRefreshInterval = null;
 let isAutoRefreshEnabled = false;
+let currentOffset = 0;
+let totalEntries = 0;
+let hasMore = false;
+let isLoading = false;
+let activeFilter = '';
 
 // Initialize page
 document.addEventListener('DOMContentLoaded', () => {
@@ -15,18 +21,28 @@ function checkAuthAndLoadLogs() {
         window.location.href = 'login.html';
         return;
     }
-    loadLogs();
+    loadLogs(true); // true = reset pagination
 }
 
 // Load logs from API
-async function loadLogs() {
+async function loadLogs(reset = false) {
+    if (isLoading) return; // Prevent concurrent loading
+    isLoading = true;
+
     const indicator = document.getElementById('refreshIndicator');
     if (indicator) {
         indicator.style.display = 'inline-block';
     }
 
+    // If reset, clear current state
+    if (reset) {
+        currentOffset = 0;
+        allLogSections = [];
+        rawLogs = '';
+    }
+
     try {
-        const response = await fetch('/api/ralph/logs', {
+        const response = await fetch(`/api/ralph/logs?limit=10&offset=${currentOffset}`, {
             headers: {
                 'Authorization': `Bearer ${getAuthToken()}`
             }
@@ -43,18 +59,41 @@ async function loadLogs() {
         }
 
         const data = await response.json();
-        rawLogs = data.logs || '';
+
+        // Update pagination state
+        totalEntries = data.totalEntries || 0;
+        hasMore = data.hasMore || false;
+
+        // Append new logs to existing
+        if (data.logs && data.logs.trim() !== '') {
+            if (rawLogs) {
+                rawLogs += '\n' + data.logs;
+            } else {
+                rawLogs = data.logs;
+            }
+
+            // Update offset for next load
+            currentOffset += data.returnedEntries || 0;
+        }
 
         displayLogs(rawLogs);
         updateStats();
+        updateLoadMoreButton();
     } catch (error) {
         console.error('Error loading logs:', error);
         showError('Failed to load logs. Please try again.');
     } finally {
+        isLoading = false;
         if (indicator) {
             indicator.style.display = 'none';
         }
     }
+}
+
+// Load more logs (pagination)
+async function loadMoreLogs() {
+    if (!hasMore || isLoading) return;
+    await loadLogs(false);
 }
 
 // Display logs with syntax highlighting
@@ -69,6 +108,34 @@ function displayLogs(logs) {
     // Apply syntax highlighting
     const highlightedLogs = highlightLogs(logs);
     container.innerHTML = highlightedLogs;
+}
+
+// Update load more button visibility and text
+function updateLoadMoreButton() {
+    let loadMoreBtn = document.getElementById('loadMoreBtn');
+
+    // Create button if it doesn't exist
+    if (!loadMoreBtn) {
+        loadMoreBtn = document.createElement('button');
+        loadMoreBtn.id = 'loadMoreBtn';
+        loadMoreBtn.className = 'btn btn-primary';
+        loadMoreBtn.onclick = loadMoreLogs;
+        loadMoreBtn.style.display = 'block';
+        loadMoreBtn.style.margin = '20px auto';
+        loadMoreBtn.style.minWidth = '200px';
+
+        // Insert after logs container
+        const container = document.getElementById('logsContainer');
+        container.parentNode.insertBefore(loadMoreBtn, container.nextSibling);
+    }
+
+    if (hasMore) {
+        loadMoreBtn.style.display = 'block';
+        loadMoreBtn.textContent = isLoading ? 'Loading...' : `Load More (${totalEntries - currentOffset} remaining)`;
+        loadMoreBtn.disabled = isLoading;
+    } else {
+        loadMoreBtn.style.display = 'none';
+    }
 }
 
 // Highlight logs with color coding
@@ -140,11 +207,15 @@ function updateStats() {
     }
 
     const lines = rawLogs.split('\n');
-    const sections = rawLogs.split('##').filter(s => s.trim() !== '').length - 1; // -1 for title
     const taskMatches = rawLogs.match(/task-\d+/g) || [];
     const uniqueTasks = [...new Set(taskMatches)].length;
 
-    statsText.textContent = `${lines.length} lines | ${sections} log entries | ${uniqueTasks} unique tasks`;
+    let statsMessage = `Showing ${currentOffset} of ${totalEntries} log entries`;
+    if (uniqueTasks > 0) {
+        statsMessage += ` | ${uniqueTasks} unique tasks`;
+    }
+
+    statsText.textContent = statsMessage;
 }
 
 // Filter logs
@@ -194,7 +265,7 @@ function setupFilterListener() {
 
 // Refresh logs manually
 function refreshLogs() {
-    loadLogs();
+    loadLogs(true); // Reset pagination when manually refreshing
 }
 
 // Toggle auto-refresh
@@ -205,7 +276,7 @@ function toggleAutoRefresh() {
     if (isAutoRefreshEnabled) {
         // Start auto-refresh every 5 seconds
         autoRefreshInterval = setInterval(() => {
-            loadLogs();
+            loadLogs(true); // Reset pagination on auto-refresh
         }, 5000);
     } else {
         // Stop auto-refresh

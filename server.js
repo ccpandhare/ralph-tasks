@@ -517,12 +517,16 @@ const server = http.createServer((req, res) => {
             return;
         }
 
+        // Parse query parameters for pagination
+        const limit = parseInt(parsedUrl.query.limit) || 10; // Default 10 entries per page
+        const offset = parseInt(parsedUrl.query.offset) || 0; // Default offset 0
+
         // Read logs file
         fs.readFile(LOGS_FILE, 'utf8', (err, data) => {
             if (err) {
                 if (err.code === 'ENOENT') {
                     // File doesn't exist yet
-                    sendJSON(res, 200, { logs: '', exists: false });
+                    sendJSON(res, 200, { logs: '', exists: false, totalEntries: 0, hasMore: false });
                 } else {
                     console.error('Error reading logs file:', err);
                     sendError(res, 500, 'Failed to read logs file');
@@ -530,7 +534,72 @@ const server = http.createServer((req, res) => {
                 return;
             }
 
-            sendJSON(res, 200, { logs: data, exists: true });
+            // Parse log sections (each task entry)
+            // Sections start with "## [" and end before the next "## [" or "---"
+            const sections = [];
+            const lines = data.split('\n');
+            let currentSection = [];
+            let inHeader = false;
+
+            for (let i = 0; i < lines.length; i++) {
+                const line = lines[i];
+
+                // Check if this is a section header (## [Date] - task-XXX - Project)
+                if (line.trim().startsWith('## [') && line.includes('task-')) {
+                    // If we have a current section, save it (unless it's the file header)
+                    if (currentSection.length > 0 && !inHeader) {
+                        sections.push(currentSection.join('\n'));
+                    }
+                    // Start new section
+                    currentSection = [line];
+                    inHeader = false;
+                } else if (line.trim() === '---') {
+                    // End of section
+                    if (currentSection.length > 0) {
+                        currentSection.push(line);
+                        if (!inHeader) {
+                            sections.push(currentSection.join('\n'));
+                        }
+                        currentSection = [];
+                    }
+                } else if (line.trim().startsWith('## Codebase Patterns')) {
+                    // This is the header section, skip it
+                    inHeader = true;
+                    currentSection = [];
+                } else {
+                    // Add line to current section
+                    currentSection.push(line);
+                }
+            }
+
+            // Add last section if exists
+            if (currentSection.length > 0 && !inHeader) {
+                sections.push(currentSection.join('\n'));
+            }
+
+            // Filter out empty sections
+            const nonEmptySections = sections.filter(s => s.trim() !== '');
+
+            // Reverse sections to show latest first
+            nonEmptySections.reverse();
+
+            // Apply pagination
+            const totalEntries = nonEmptySections.length;
+            const paginatedSections = nonEmptySections.slice(offset, offset + limit);
+            const hasMore = offset + limit < totalEntries;
+
+            // Combine sections (join with newline separator)
+            const logs = paginatedSections.join('\n');
+
+            sendJSON(res, 200, {
+                logs: logs,
+                exists: true,
+                totalEntries: totalEntries,
+                limit: limit,
+                offset: offset,
+                hasMore: hasMore,
+                returnedEntries: paginatedSections.length
+            });
         });
         return;
     }
