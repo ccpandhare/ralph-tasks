@@ -256,6 +256,32 @@ The task management app includes Ralph execution capability:
 - **Polling:** Status checked every 3 seconds during execution
 - **Backend:** Uses child_process.spawn to run `/var/main/scripts/ralph-once.sh`
 
+### Claude CLI Credentials
+
+**CRITICAL:** Ralph execution requires Claude CLI credentials to be accessible by the `www-data` user.
+
+The systemd service runs as `www-data`, which means:
+- Claude CLI looks for credentials in `/var/www/.claude/.credentials.json`
+- Credentials must be owned by `www-data:www-data` with permissions `600`
+- If credentials are missing, Ralph will fail with "Claude unauthorised" error
+
+**Setup credentials for www-data:**
+```bash
+# Copy credentials from root to www-data home directory
+sudo mkdir -p /var/www/.claude
+sudo cp /root/.claude/.credentials.json /var/www/.claude/
+sudo chown -R www-data:www-data /var/www/.claude
+sudo chmod 600 /var/www/.claude/.credentials.json
+```
+
+**Verify credentials work:**
+```bash
+# Test Claude CLI as www-data user
+sudo -u www-data claude --print <<< "test"
+```
+
+If the test succeeds and Claude responds, the credentials are correctly configured.
+
 **Testing Ralph execution:**
 ```bash
 # Get the password hash from .env
