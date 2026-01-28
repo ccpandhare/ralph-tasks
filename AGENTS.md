@@ -74,6 +74,21 @@ drwxrwxr-x root www-data /var/main
 
 **Note:** The server uses atomic writes (write to `.tmp` file, then rename) which requires write permission to both the directory and the files.
 
+**Ralph Execution Logs Directory:**
+```bash
+# Ralph logs directory - must be writable by www-data
+drwxr-xr-x www-data www-data /var/main/logs/ralph-runs
+```
+
+If the directory doesn't exist, create it with:
+```bash
+mkdir -p /var/main/logs/ralph-runs
+chown www-data:www-data /var/main/logs/ralph-runs
+chmod 755 /var/main/logs/ralph-runs
+```
+
+Without proper permissions, Ralph execution will fail with "EACCES: permission denied" error when trying to create log files.
+
 ### Nginx Proxy Setup
 
 The nginx configuration MUST include the `/api/` proxy pass to the Node.js backend:
