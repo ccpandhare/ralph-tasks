@@ -18,18 +18,50 @@
 
     <main class="container">
         <div class="content-area">
-            <div class="page-actions">
+            <!-- Primary Actions -->
+            <div class="primary-actions">
                 <div class="view-controls">
                     <button id="openTasksBtn" class="view-btn active" onclick="showOpenTasks()">Open Tasks</button>
                     <button id="completedTasksBtn" class="view-btn" onclick="showCompletedTasks()">Completed Tasks</button>
                 </div>
-                <div class="action-buttons">
-                    <a href="logs.html" class="btn btn-secondary">📋 View Logs</a>
-                    <a href="ralph-logs.html" class="btn btn-secondary">🔍 Ralph Execution Logs</a>
-                    <button id="ralphBtn" class="btn btn-ralph" onclick="executeRalph()">Run Ralph</button>
-                    <a href="create-task.html" class="btn btn-primary">Create New Task</a>
+                <a href="create-task.html" class="btn btn-primary">+ Create Task</a>
+            </div>
+
+            <!-- Compact Auto-Run Status -->
+            <div class="auto-run-compact" id="autoRunStatus">
+                <div class="auto-run-inline">
+                    <span class="auto-run-icon">🤖</span>
+                    <span class="auto-run-text">
+                        <span id="executingStatus" class="auto-run-badge">...</span>
+                        <span id="lastRunTime" class="auto-run-time">...</span>
+                    </span>
+                    <a href="ralph-auto.html" class="btn-link">View Auto-Run Logs →</a>
+                </div>
+                <button id="moreOptionsBtn" class="btn-text" onclick="toggleMoreOptions()">More Options ▾</button>
+            </div>
+
+            <!-- More Options Panel (Initially Hidden) -->
+            <div class="more-options-panel hidden" id="moreOptionsPanel">
+                <div class="options-grid">
+                    <a href="logs.html" class="option-link">
+                        <span class="option-icon">📋</span>
+                        <span class="option-text">Progress Logs</span>
+                    </a>
+                    <a href="ralph-logs.html" class="option-link">
+                        <span class="option-icon">🔍</span>
+                        <span class="option-text">Ralph Execution Logs</span>
+                    </a>
+                    <button class="option-link" onclick="executeRalph()">
+                        <span class="option-icon">▶️</span>
+                        <span class="option-text">Run Ralph Once</span>
+                    </button>
+                    <button class="option-link" onclick="refreshAutoStatus()">
+                        <span class="option-icon">🔄</span>
+                        <span class="option-text">Refresh Status</span>
+                    </button>
                 </div>
             </div>
+
             <div id="taskList">
                 <p class="loading">Loading tasks...</p>
             </div>

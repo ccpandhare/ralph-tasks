@@ -637,6 +637,22 @@ async function toggleWatcher() {
     }
 }
 
+// Toggle more options panel
+function toggleMoreOptions() {
+    const panel = document.getElementById('moreOptionsPanel');
+    const btn = document.getElementById('moreOptionsBtn');
+    if (!panel || !btn) return;
+
+    const isHidden = panel.classList.contains('hidden');
+    if (isHidden) {
+        panel.classList.remove('hidden');
+        btn.textContent = 'Less Options ▴';
+    } else {
+        panel.classList.add('hidden');
+        btn.textContent = 'More Options ▾';
+    }
+}
+
 // Load tasks when page loads
 if (document.getElementById('taskList')) {
     initializePage();
