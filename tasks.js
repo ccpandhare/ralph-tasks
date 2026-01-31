@@ -484,8 +484,162 @@ async function checkInitialRalphStatus() {
     }
 }
 
+// Auto-run status functions
+let autoStatusInterval = null;
+
+async function fetchAutoStatus() {
+    const token = sessionStorage.getItem('authToken');
+    if (!token) return null;
+
+    try {
+        const response = await fetch(`${API_BASE}/ralph/auto-status`, {
+            headers: {
+                'Authorization': `Bearer ${token}`
+            }
+        });
+
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        return await response.json();
+    } catch (error) {
+        console.error('Failed to fetch auto-run status:', error);
+        return null;
+    }
+}
+
+function updateAutoRunDisplay(status) {
+    if (!status) return;
+
+    // Update watcher status
+    const watcherStatusEl = document.getElementById('watcherStatus');
+    const watcherToggleBtn = document.getElementById('watcherToggleBtn');
+    if (watcherStatusEl) {
+        if (status.watcherRunning) {
+            watcherStatusEl.textContent = 'Active';
+            watcherStatusEl.className = 'auto-run-badge active';
+            if (watcherToggleBtn) {
+                watcherToggleBtn.textContent = 'Stop';
+                watcherToggleBtn.style.display = 'inline-block';
+            }
+        } else {
+            watcherStatusEl.textContent = 'Stopped';
+            watcherStatusEl.className = 'auto-run-badge inactive';
+            if (watcherToggleBtn) {
+                watcherToggleBtn.textContent = 'Start';
+                watcherToggleBtn.style.display = 'inline-block';
+            }
+        }
+    }
+
+    // Update executing status
+    const executingStatusEl = document.getElementById('executingStatus');
+    const executingPidEl = document.getElementById('executingPid');
+    if (executingStatusEl) {
+        if (status.ralphExecuting) {
+            executingStatusEl.textContent = 'Running';
+            executingStatusEl.className = 'auto-run-badge executing';
+            if (executingPidEl && status.currentPid) {
+                executingPidEl.textContent = `PID: ${status.currentPid}`;
+            }
+        } else {
+            executingStatusEl.textContent = 'Idle';
+            executingStatusEl.className = 'auto-run-badge inactive';
+            if (executingPidEl) {
+                executingPidEl.textContent = '';
+            }
+        }
+    }
+
+    // Update last run time
+    const lastRunTimeEl = document.getElementById('lastRunTime');
+    if (lastRunTimeEl) {
+        if (status.lastRunTime) {
+            lastRunTimeEl.textContent = formatTimestamp(status.lastRunTime);
+        } else {
+            lastRunTimeEl.textContent = 'Never';
+        }
+    }
+}
+
+function formatTimestamp(timestamp) {
+    try {
+        const date = new Date(timestamp);
+        const now = new Date();
+        const diffMs = now - date;
+        const diffMins = Math.floor(diffMs / 60000);
+
+        if (diffMins < 1) return 'Just now';
+        if (diffMins < 60) return `${diffMins} min ago`;
+        if (diffMins < 1440) return `${Math.floor(diffMins / 60)} hrs ago`;
+        return date.toLocaleString();
+    } catch (e) {
+        return timestamp;
+    }
+}
+
+async function refreshAutoStatus() {
+    const refreshBtn = document.getElementById('refreshAutoStatusBtn');
+    if (refreshBtn) {
+        refreshBtn.style.transform = 'rotate(360deg)';
+        refreshBtn.style.transition = 'transform 0.5s ease';
+        setTimeout(() => {
+            refreshBtn.style.transform = '';
+        }, 500);
+    }
+
+    const status = await fetchAutoStatus();
+    updateAutoRunDisplay(status);
+}
+
+function startAutoStatusPolling() {
+    // Initial fetch
+    refreshAutoStatus();
+
+    // Poll every 10 seconds
+    if (autoStatusInterval) {
+        clearInterval(autoStatusInterval);
+    }
+    autoStatusInterval = setInterval(refreshAutoStatus, 10000);
+}
+
+async function toggleWatcher() {
+    const token = sessionStorage.getItem('authToken');
+    if (!token) return;
+
+    const watcherStatusEl = document.getElementById('watcherStatus');
+    const isActive = watcherStatusEl && watcherStatusEl.classList.contains('active');
+
+    const endpoint = isActive ? '/ralph/auto/stop' : '/ralph/auto/start';
+    const action = isActive ? 'stop' : 'start';
+
+    try {
+        const response = await fetch(`${API_BASE}${endpoint}`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${token}`
+            }
+        });
+
+        if (!response.ok) {
+            throw new Error(`Failed to ${action} watcher`);
+        }
+
+        const result = await response.json();
+        showMessage(result.message, 'success');
+
+        // Refresh status after 1 second
+        setTimeout(refreshAutoStatus, 1000);
+    } catch (error) {
+        console.error(`Failed to ${action} watcher:`, error);
+        showMessage(`Failed to ${action} file watcher`, 'error');
+    }
+}
+
 // Load tasks when page loads
 if (document.getElementById('taskList')) {
     initializePage();
     checkInitialRalphStatus();
+    startAutoStatusPolling();
 }
