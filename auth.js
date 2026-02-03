@@ -30,8 +30,8 @@ async function checkAuthentication() {
 
 // Redirect to central auth for login
 function redirectToLogin() {
-    const redirectUrl = encodeURIComponent(CURRENT_URL + '/');
-    window.location.href = `${CENTRAL_AUTH_URL}/?redirect=${redirectUrl}&service=${SERVICE_NAME}`;
+    const redirectUrl = encodeURIComponent(CURRENT_URL);
+    window.location.href = `${CENTRAL_AUTH_URL}/login?service=${SERVICE_NAME}&redirect=${redirectUrl}`;
 }
 
 // Logout - call central auth logout endpoint then redirect
@@ -82,14 +82,18 @@ function isTestAccountSession() {
 // Handle authentication on page load
 async function handleAuth() {
     const isLoginPage = window.location.pathname.includes('login.html');
+    const isTestMode = new URLSearchParams(window.location.search).get('test') === '1';
 
     if (isLoginPage) {
         // On login page, check if already authenticated to redirect away
         const isAuthenticated = await checkAuthentication();
         if (isAuthenticated) {
             window.location.href = 'index.html';
+        } else if (!isTestMode && !isTestAccountSession()) {
+            // For regular users, auto-redirect to central auth (no need to see login page)
+            redirectToLogin();
         }
-        // Otherwise show the login page (no redirect)
+        // For test mode (?test=1), show the login page with test form
     } else {
         // On protected pages, verify authentication
         const isAuthenticated = await checkAuthentication();
