@@ -35,8 +35,8 @@ describe('Hello World E2E Test', () => {
   });
 
   test('should load the webpage successfully with 200 status', async () => {
-    // Navigate to the page
-    const response = await page.goto(BASE_URL, {
+    // Navigate to the login page (which doesn't require auth)
+    const response = await page.goto(`${BASE_URL}/login.html`, {
       waitUntil: 'networkidle0',
       timeout: 30000
     });
@@ -51,13 +51,13 @@ describe('Hello World E2E Test', () => {
     expect(title.length).toBeGreaterThan(0);
 
     console.log(`✓ Page loaded successfully`);
-    console.log(`  - URL: ${BASE_URL}`);
+    console.log(`  - URL: ${BASE_URL}/login.html`);
     console.log(`  - Status: ${response.status()}`);
     console.log(`  - Title: ${title}`);
   });
 
   test('should have proper HTML structure', async () => {
-    await page.goto(BASE_URL, {
+    await page.goto(`${BASE_URL}/login.html`, {
       waitUntil: 'networkidle0',
       timeout: 30000
     });
@@ -76,7 +76,7 @@ describe('Hello World E2E Test', () => {
   });
 
   test('should be accessible and render content', async () => {
-    await page.goto(BASE_URL, {
+    await page.goto(`${BASE_URL}/login.html`, {
       waitUntil: 'networkidle0',
       timeout: 30000
     });
