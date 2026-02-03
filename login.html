@@ -7,6 +7,57 @@
     <meta name="author" content="Chinmay Pandhare">
     <title>Login - Task Manager</title>
     <link rel="stylesheet" href="style.css">
+    <style>
+        .central-auth-btn {
+            background: #2563eb;
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            font-size: 1.1rem;
+            border-radius: 8px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            width: 100%;
+            margin-bottom: 20px;
+            transition: background 0.2s;
+        }
+        .central-auth-btn:hover {
+            background: #1d4ed8;
+        }
+        .divider {
+            display: flex;
+            align-items: center;
+            margin: 20px 0;
+            color: #666;
+            font-size: 0.9rem;
+        }
+        .divider::before,
+        .divider::after {
+            content: '';
+            flex: 1;
+            border-bottom: 1px solid #ddd;
+        }
+        .divider::before {
+            margin-right: 15px;
+        }
+        .divider::after {
+            margin-left: 15px;
+        }
+        .test-section {
+            opacity: 0.7;
+        }
+        .test-section:hover {
+            opacity: 1;
+        }
+        .test-label {
+            font-size: 0.85rem;
+            color: #888;
+            margin-bottom: 10px;
+        }
+    </style>
 </head>
 <body>
     <header>
@@ -18,14 +69,30 @@
     <main class="container">
         <div class="content-area login-container">
             <h2>Login</h2>
-            <form id="loginForm">
-                <div class="form-group">
-                    <label for="password">Password</label>
-                    <input type="password" id="password" name="password" required autofocus>
-                </div>
-                <div id="errorMessage" class="error-message"></div>
-                <button type="submit" class="btn btn-primary">Login</button>
-            </form>
+
+            <!-- Primary: Central Auth Login -->
+            <button class="central-auth-btn" onclick="redirectToLogin()">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M12 2a5 5 0 0 1 5 5v3H7V7a5 5 0 0 1 5-5z"/>
+                    <rect x="3" y="10" width="18" height="12" rx="2"/>
+                    <circle cx="12" cy="16" r="1"/>
+                </svg>
+                Login with Passkey
+            </button>
+
+            <!-- Test Account Section (for E2E tests) -->
+            <div class="divider">Test Account Only</div>
+            <div class="test-section">
+                <p class="test-label">For automated testing only:</p>
+                <form id="loginForm">
+                    <div class="form-group">
+                        <label for="password">Test Password</label>
+                        <input type="password" id="password" name="password" required>
+                    </div>
+                    <div id="errorMessage" class="error-message"></div>
+                    <button type="submit" class="btn btn-secondary" style="width: 100%;">Test Login</button>
+                </form>
+            </div>
         </div>
     </main>
 

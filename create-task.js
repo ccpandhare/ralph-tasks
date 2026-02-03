@@ -2,22 +2,23 @@
 const API_URL = '/api/tasks';
 const PROJECTS_API_URL = '/api/projects';
 
+// Build request headers (use Bearer token for tests, otherwise rely on cookies)
+function buildCreateHeaders() {
+    const token = getAuthToken();
+    const headers = { 'Content-Type': 'application/json' };
+    if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+    }
+    return headers;
+}
+
 // Load projects from API and populate dropdown
 async function loadProjects() {
-    const token = getAuthToken();
-    if (!token) {
-        console.error('No authentication token available');
-        showError('Authentication required. Please log in.');
-        return;
-    }
-
     try {
         const response = await fetch(PROJECTS_API_URL, {
             method: 'GET',
-            headers: {
-                'Authorization': `Bearer ${token}`,
-                'Content-Type': 'application/json'
-            }
+            headers: buildCreateHeaders(),
+            credentials: 'include'
         });
 
         if (!response.ok) {
@@ -79,18 +80,11 @@ function removeRequirement(button) {
 
 // Get next task ID from existing tasks
 async function getNextTaskId() {
-    const token = getAuthToken();
-    if (!token) {
-        return null;
-    }
-
     try {
         const response = await fetch(API_URL, {
             method: 'GET',
-            headers: {
-                'Authorization': `Bearer ${token}`,
-                'Content-Type': 'application/json'
-            }
+            headers: buildCreateHeaders(),
+            credentials: 'include'
         });
 
         if (!response.ok) {
@@ -259,19 +253,11 @@ async function handleSubmit(event) {
     };
 
     // Submit to API
-    const token = getAuthToken();
-    if (!token) {
-        showError('Authentication required. Please log in.');
-        return;
-    }
-
     try {
         const response = await fetch(API_URL, {
             method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${token}`,
-                'Content-Type': 'application/json'
-            },
+            headers: buildCreateHeaders(),
+            credentials: 'include',
             body: JSON.stringify(newTask)
         });
 

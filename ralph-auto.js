@@ -5,16 +5,22 @@ const API_BASE = window.location.hostname === 'localhost' ? 'http://localhost:30
 let currentLogType = 'auto-run';
 let autoRefreshInterval = null;
 
+// Build request headers (use Bearer token for tests, otherwise rely on cookies)
+function buildAutoHeaders() {
+    const token = getAuthToken();
+    const headers = { 'Content-Type': 'application/json' };
+    if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+    }
+    return headers;
+}
+
 // Fetch auto-run status
 async function fetchAutoStatus() {
-    const token = sessionStorage.getItem('authToken');
-    if (!token) return null;
-
     try {
         const response = await fetch(`${API_BASE}/ralph/auto-status`, {
-            headers: {
-                'Authorization': `Bearer ${token}`
-            }
+            headers: buildAutoHeaders(),
+            credentials: 'include'
         });
 
         if (!response.ok) {
@@ -30,14 +36,10 @@ async function fetchAutoStatus() {
 
 // Fetch auto-run logs
 async function fetchAutoLogs(type = 'auto-run', limit = 500) {
-    const token = sessionStorage.getItem('authToken');
-    if (!token) return null;
-
     try {
         const response = await fetch(`${API_BASE}/ralph/auto-logs?type=${type}&limit=${limit}`, {
-            headers: {
-                'Authorization': `Bearer ${token}`
-            }
+            headers: buildAutoHeaders(),
+            credentials: 'include'
         });
 
         if (!response.ok) {
@@ -228,9 +230,6 @@ function toggleAutoRefresh() {
 
 // Toggle watcher
 async function toggleWatcher() {
-    const token = sessionStorage.getItem('authToken');
-    if (!token) return;
-
     const watcherStatusEl = document.getElementById('watcherStatusOverview');
     const isActive = watcherStatusEl && watcherStatusEl.classList.contains('success');
 
@@ -240,9 +239,8 @@ async function toggleWatcher() {
     try {
         const response = await fetch(`${API_BASE}${endpoint}`, {
             method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${token}`
-            }
+            headers: buildAutoHeaders(),
+            credentials: 'include'
         });
 
         if (!response.ok) {
@@ -266,22 +264,8 @@ async function updateStatus() {
     updateStatusOverview(status);
 }
 
-// Logout function
-function logout() {
-    sessionStorage.removeItem('authenticated');
-    sessionStorage.removeItem('authToken');
-    window.location.href = 'login.html';
-}
-
 // Initialize page
 async function initializePage() {
-    // Check authentication
-    const token = sessionStorage.getItem('authToken');
-    if (!token) {
-        window.location.href = 'login.html';
-        return;
-    }
-
     // Load initial data
     await updateStatus();
     await refreshCurrentLog();

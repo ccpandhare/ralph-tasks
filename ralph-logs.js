@@ -1,8 +1,3 @@
-// Check authentication on page load
-if (!isAuthenticated()) {
-    window.location.href = 'login.html';
-}
-
 // Global variables
 let autoRefreshInterval = null;
 let currentLogFile = null;
@@ -10,6 +5,16 @@ let isHistoryVisible = false;
 
 // API base URL
 const API_URL = '/api';
+
+// Build request headers (use Bearer token for tests, otherwise rely on cookies)
+function buildRalphLogHeaders() {
+    const token = getAuthToken();
+    const headers = { 'Content-Type': 'application/json' };
+    if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+    }
+    return headers;
+}
 
 // Initialize the page
 async function initializePage() {
@@ -22,9 +27,8 @@ async function initializePage() {
 async function refreshCurrentLog() {
     try {
         const response = await fetch(`${API_URL}/ralph/current-log`, {
-            headers: {
-                'Authorization': `Bearer ${getAuthToken()}`
-            }
+            headers: buildRalphLogHeaders(),
+            credentials: 'include'
         });
 
         if (!response.ok) {
@@ -132,9 +136,8 @@ function updateStatusIndicator(isRunning) {
 async function loadLogHistory() {
     try {
         const response = await fetch(`${API_URL}/ralph/log-history`, {
-            headers: {
-                'Authorization': `Bearer ${getAuthToken()}`
-            }
+            headers: buildRalphLogHeaders(),
+            credentials: 'include'
         });
 
         if (!response.ok) {
@@ -181,9 +184,8 @@ function displayLogHistory(logs) {
 async function loadHistoricalLog(filename) {
     try {
         const response = await fetch(`${API_URL}/ralph/log/${filename}`, {
-            headers: {
-                'Authorization': `Bearer ${getAuthToken()}`
-            }
+            headers: buildRalphLogHeaders(),
+            credentials: 'include'
         });
 
         if (!response.ok) {

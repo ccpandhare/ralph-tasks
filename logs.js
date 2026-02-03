@@ -15,12 +15,18 @@ document.addEventListener('DOMContentLoaded', () => {
     setupFilterListener();
 });
 
+// Build request headers (use Bearer token for tests, otherwise rely on cookies)
+function buildLogHeaders() {
+    const token = getAuthToken();
+    const headers = { 'Content-Type': 'application/json' };
+    if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+    }
+    return headers;
+}
+
 // Check authentication and load logs
 function checkAuthAndLoadLogs() {
-    if (!isUserAuthenticated()) {
-        window.location.href = 'login.html';
-        return;
-    }
     loadLogs(true); // true = reset pagination
 }
 
@@ -43,9 +49,8 @@ async function loadLogs(reset = false) {
 
     try {
         const response = await fetch(`/api/ralph/logs?limit=10&offset=${currentOffset}`, {
-            headers: {
-                'Authorization': `Bearer ${getAuthToken()}`
-            }
+            headers: buildLogHeaders(),
+            credentials: 'include'
         });
 
         if (response.status === 401) {

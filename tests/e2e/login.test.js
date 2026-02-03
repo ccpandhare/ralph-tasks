@@ -40,16 +40,16 @@ describe('Login Flow E2E Tests', () => {
     }
   });
 
-  test('should redirect unauthenticated users to login page when accessing index', async () => {
+  test('should redirect unauthenticated users to central auth when accessing index', async () => {
     // Try to access index.html without authentication
     const response = await page.goto(`${BASE_URL}/index.html`, {
       waitUntil: 'networkidle0',
       timeout: 30000
     });
 
-    // Should redirect to login.html
-    expect(page.url()).toContain('login.html');
-    console.log('✓ Unauthenticated user redirected to login page');
+    // Should redirect to central auth (auth.chinmaypandhare.uk)
+    expect(page.url()).toContain('auth.chinmaypandhare.uk');
+    console.log('✓ Unauthenticated user redirected to central auth');
   });
 
   test('should successfully login with correct password', async () => {
@@ -124,9 +124,9 @@ describe('Login Flow E2E Tests', () => {
     // Get error message text
     const errorText = await page.$eval('#errorMessage', el => el.textContent);
 
-    // Verify error message
+    // Verify error message (new message directs to Central Auth for non-test passwords)
     expect(errorText).toBeTruthy();
-    expect(errorText).toContain('Incorrect password');
+    expect(errorText).toContain('Central Auth');
 
     // Should still be on login page
     expect(page.url()).toContain('login.html');
@@ -189,12 +189,13 @@ describe('Login Flow E2E Tests', () => {
     // Should redirect to login.html
     expect(page.url()).toContain('login.html');
 
-    // Check sessionStorage is cleared
+    // Check sessionStorage is cleared (should be null or 'false')
     const authenticated = await page.evaluate(() => {
       return sessionStorage.getItem('authenticated');
     });
 
-    expect(authenticated).toBe('false');
+    // After logout, sessionStorage is cleared (null) not set to 'false'
+    expect(authenticated).toBeNull();
 
     console.log('✓ Logout successful - redirected to login and session cleared');
   });

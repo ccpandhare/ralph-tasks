@@ -1,19 +1,71 @@
-// Password hashes - updated regularly for security
-// The actual passwords are stored securely in the server's .env file
-const PASSWORD_HASH = "0fc9d5faa3ab9b9e53f94f3070c29854a0d7982ab4de27f8530c96c596a315d4";
-const TEST_PASSWORD_HASH = "709dd3e8bf11b4a56227095a635ddf42a3da473f8db0441f7c01e24c671dd60d"; // Test account for E2E tests
+// Central Auth Configuration
+const CENTRAL_AUTH_URL = 'https://auth.chinmaypandhare.uk';
+const SERVICE_NAME = 'tasks';
+const CURRENT_URL = window.location.origin;
 
-// Check if user is already authenticated
-function isAuthenticated() {
-    return sessionStorage.getItem('authenticated') === 'true';
+// Legacy test password hash for E2E tests only
+const TEST_PASSWORD_HASH = "709dd3e8bf11b4a56227095a635ddf42a3da473f8db0441f7c01e24c671dd60d";
+
+// Check if user is authenticated with the backend (which verifies with central auth)
+async function checkAuthentication() {
+    try {
+        // Build headers (includes Bearer token for test account)
+        const headers = {};
+        const token = getAuthToken();
+        if (token) {
+            headers['Authorization'] = `Bearer ${token}`;
+        }
+
+        const response = await fetch('/api/tasks', {
+            method: 'GET',
+            headers: headers,
+            credentials: 'include'
+        });
+        return response.ok;
+    } catch (error) {
+        console.error('Error checking authentication:', error);
+        return false;
+    }
 }
 
-// Set authentication state
-function setAuthenticated(value) {
-    sessionStorage.setItem('authenticated', value ? 'true' : 'false');
+// Redirect to central auth for login
+function redirectToLogin() {
+    const redirectUrl = encodeURIComponent(CURRENT_URL + '/');
+    window.location.href = `${CENTRAL_AUTH_URL}/?redirect=${redirectUrl}&service=${SERVICE_NAME}`;
 }
 
-// SHA-256 hash function
+// Logout - call central auth logout endpoint then redirect
+async function logout() {
+    // Clear any local session state
+    sessionStorage.removeItem('authenticated');
+    sessionStorage.removeItem('authToken');
+
+    try {
+        // Call the central auth logout endpoint (clears the cookie)
+        await fetch(`${CENTRAL_AUTH_URL}/api/auth/logout`, {
+            method: 'POST',
+            credentials: 'include'
+        });
+    } catch (error) {
+        console.error('Logout error:', error);
+    }
+
+    // Redirect to login page
+    window.location.href = 'login.html';
+}
+
+// Get authentication token for API requests (for E2E tests using Bearer token)
+function getAuthToken() {
+    // Return test token if stored (for E2E tests)
+    const testToken = sessionStorage.getItem('authToken');
+    if (testToken === TEST_PASSWORD_HASH) {
+        return testToken;
+    }
+    // For central auth, cookies are used automatically
+    return null;
+}
+
+// SHA-256 hash function (kept for E2E test compatibility)
 async function sha256(message) {
     const msgBuffer = new TextEncoder().encode(message);
     const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
@@ -22,13 +74,39 @@ async function sha256(message) {
     return hashHex;
 }
 
-// Logout function
-function logout() {
-    setAuthenticated(false);
-    window.location.href = 'login.html';
+// Check if test account is being used (for E2E tests)
+function isTestAccountSession() {
+    return sessionStorage.getItem('authToken') === TEST_PASSWORD_HASH;
 }
 
-// Handle login form submission
+// Handle authentication on page load
+async function handleAuth() {
+    const isLoginPage = window.location.pathname.includes('login.html');
+
+    if (isLoginPage) {
+        // On login page, check if already authenticated to redirect away
+        const isAuthenticated = await checkAuthentication();
+        if (isAuthenticated) {
+            window.location.href = 'index.html';
+        }
+        // Otherwise show the login page (no redirect)
+    } else {
+        // On protected pages, verify authentication
+        const isAuthenticated = await checkAuthentication();
+        if (!isAuthenticated) {
+            // For test accounts, redirect to local login
+            // For regular users, redirect to central auth
+            if (isTestAccountSession()) {
+                // Test account token exists but API failed - redirect to local login
+                window.location.href = 'login.html';
+            } else {
+                redirectToLogin();
+            }
+        }
+    }
+}
+
+// Handle login form submission (for E2E tests only)
 if (document.getElementById('loginForm')) {
     document.getElementById('loginForm').addEventListener('submit', async function(e) {
         e.preventDefault();
@@ -39,30 +117,19 @@ if (document.getElementById('loginForm')) {
         // Hash the entered password
         const hashedPassword = await sha256(password);
 
-        // Verify password (check both production and test accounts)
-        if (hashedPassword === PASSWORD_HASH || hashedPassword === TEST_PASSWORD_HASH) {
-            setAuthenticated(true);
-            // Store which account type for API calls
+        // Check if it's the test account (for E2E tests only)
+        if (hashedPassword === TEST_PASSWORD_HASH) {
+            // Store the test token for API calls
+            sessionStorage.setItem('authenticated', 'true');
             sessionStorage.setItem('authToken', hashedPassword);
             window.location.href = 'index.html';
         } else {
-            errorMessage.textContent = 'Incorrect password. Please try again.';
+            // For regular users, redirect to central auth
+            errorMessage.textContent = 'Please use the "Login with Central Auth" button to login.';
             document.getElementById('password').value = '';
-            document.getElementById('password').focus();
         }
     });
 }
 
-// Get authentication token for API requests
-function getAuthToken() {
-    if (!isAuthenticated()) return null;
-    // Return the actual token that was used to login (stored in sessionStorage)
-    return sessionStorage.getItem('authToken') || PASSWORD_HASH;
-}
-
-// Redirect to login if not authenticated (for protected pages)
-if (window.location.pathname.includes('index.html') || window.location.pathname.endsWith('/')) {
-    if (!isAuthenticated()) {
-        window.location.href = 'login.html';
-    }
-}
+// Initialize authentication on page load
+handleAuth();

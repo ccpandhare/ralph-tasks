@@ -4,16 +4,46 @@ const fs = require('fs');
 const path = require('path');
 const url = require('url');
 const { spawn } = require('child_process');
+const cookie = require('cookie');
+const fetch = require('node-fetch');
 
-// Load password hashes from environment variables
-const PASSWORD_HASH = process.env.AUTH_PASSWORD_HASH;
-const TEST_PASSWORD_HASH = process.env.TEST_AUTH_PASSWORD_HASH;
+// Central auth configuration
+const CENTRAL_AUTH_URL = process.env.CENTRAL_AUTH_URL || 'https://auth.chinmaypandhare.uk';
+const SERVICE_NAME = 'tasks';
 
-if (!PASSWORD_HASH) {
-    console.error('ERROR: AUTH_PASSWORD_HASH environment variable is not set');
-    console.error('Please ensure .env file exists with AUTH_PASSWORD_HASH defined');
-    process.exit(1);
+// Cache for auth verification to reduce load on central auth
+// Cache entries expire after 60 seconds
+const authCache = new Map();
+const CACHE_TTL_MS = 60 * 1000; // 60 seconds
+
+function getCachedAuth(sessionId) {
+    const cached = authCache.get(sessionId);
+    if (cached && Date.now() < cached.expiresAt) {
+        return cached.result;
+    }
+    authCache.delete(sessionId);
+    return null;
 }
+
+function setCachedAuth(sessionId, result) {
+    authCache.set(sessionId, {
+        result,
+        expiresAt: Date.now() + CACHE_TTL_MS
+    });
+}
+
+// Cleanup expired cache entries periodically
+setInterval(() => {
+    const now = Date.now();
+    for (const [key, value] of authCache.entries()) {
+        if (now >= value.expiresAt) {
+            authCache.delete(key);
+        }
+    }
+}, CACHE_TTL_MS);
+
+// Legacy password hash for test account only (for E2E tests)
+const TEST_PASSWORD_HASH = process.env.TEST_AUTH_PASSWORD_HASH;
 
 // Helper function to get the correct file paths based on account type
 function getFilePaths(isTestAccount) {
@@ -27,6 +57,13 @@ function getFilePaths(isTestAccount) {
         tasksFile: TASKS_FILE,
         projectsFile: PROJECTS_FILE
     };
+}
+
+// Parse cookies from request
+function parseCookies(req) {
+    const cookieHeader = req.headers.cookie;
+    if (!cookieHeader) return {};
+    return cookie.parse(cookieHeader);
 }
 
 // Port configuration
@@ -46,42 +83,89 @@ let ralphRunning = false;
 let ralphProcess = null;
 let currentRalphLogFile = null;
 
-// Helper function to check authentication and determine account type
-function getAuthInfo(req) {
+// Async helper function to check authentication with central auth
+async function getAuthInfo(req) {
+    // First check for test account via Bearer token (for E2E tests)
     const authHeader = req.headers['authorization'];
-    if (!authHeader) return { authenticated: false, isTestAccount: false };
-
-    // Expect format: "Bearer <password_hash>"
-    const parts = authHeader.split(' ');
-    if (parts.length !== 2 || parts[0] !== 'Bearer') return { authenticated: false, isTestAccount: false };
-
-    const token = parts[1];
-
-    // Check if it's the test account
-    if (TEST_PASSWORD_HASH && token === TEST_PASSWORD_HASH) {
-        return { authenticated: true, isTestAccount: true };
+    if (authHeader) {
+        const parts = authHeader.split(' ');
+        if (parts.length === 2 && parts[0] === 'Bearer') {
+            const token = parts[1];
+            // Check if it's the test account
+            if (TEST_PASSWORD_HASH && token === TEST_PASSWORD_HASH) {
+                return { authenticated: true, isTestAccount: true, username: 'test' };
+            }
+        }
     }
 
-    // Check if it's the production account
-    if (token === PASSWORD_HASH) {
-        return { authenticated: true, isTestAccount: false };
+    // Check for central auth cookie
+    const cookies = parseCookies(req);
+    const sessionId = cookies.ccp_auth_token;
+
+    if (!sessionId) {
+        return { authenticated: false, isTestAccount: false };
     }
 
-    return { authenticated: false, isTestAccount: false };
+    // Check cache first
+    const cached = getCachedAuth(sessionId);
+    if (cached) {
+        if (cached.valid) {
+            return { authenticated: true, isTestAccount: false, username: cached.username };
+        } else {
+            return { authenticated: false, isTestAccount: false, reason: cached.reason };
+        }
+    }
+
+    // Verify with central auth
+    try {
+        const response = await fetch(`${CENTRAL_AUTH_URL}/api/verify?service=${SERVICE_NAME}`, {
+            method: 'GET',
+            headers: {
+                'Cookie': `ccp_auth_token=${sessionId}`,
+            },
+        });
+
+        if (!response.ok) {
+            console.error(`[AUTH] Central auth returned ${response.status}`);
+            return { authenticated: false, isTestAccount: false, reason: 'auth_error' };
+        }
+
+        const result = await response.json();
+
+        // Cache the result
+        setCachedAuth(sessionId, result);
+
+        if (!result.valid) {
+            console.log(`[AUTH] Session invalid: ${result.reason}, username: ${result.username || 'unknown'}`);
+            return { authenticated: false, isTestAccount: false, reason: result.reason };
+        }
+
+        return {
+            authenticated: true,
+            isTestAccount: false,
+            username: result.username,
+            isAdmin: result.isAdmin || false
+        };
+    } catch (error) {
+        console.error('[AUTH] Error verifying session with central auth:', error.message);
+        return { authenticated: false, isTestAccount: false, reason: 'auth_error' };
+    }
 }
 
-// Legacy helper for backward compatibility
-function isAuthenticated(req) {
-    return getAuthInfo(req).authenticated;
+// Legacy helper for backward compatibility (now async)
+async function isAuthenticated(req) {
+    const authInfo = await getAuthInfo(req);
+    return authInfo.authenticated;
 }
 
 // Helper function to send JSON response
 function sendJSON(res, statusCode, data) {
     res.writeHead(statusCode, {
         'Content-Type': 'application/json',
-        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Origin': 'https://tasks.chinmaypandhare.uk',
         'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-        'Access-Control-Allow-Headers': 'Content-Type, Authorization'
+        'Access-Control-Allow-Headers': 'Content-Type, Authorization, Cookie',
+        'Access-Control-Allow-Credentials': 'true'
     });
     res.end(JSON.stringify(data));
 }
@@ -91,8 +175,8 @@ function sendError(res, statusCode, message) {
     sendJSON(res, statusCode, { error: message });
 }
 
-// Create HTTP server
-const server = http.createServer((req, res) => {
+// Create HTTP server with async handler
+const server = http.createServer(async (req, res) => {
     const parsedUrl = url.parse(req.url, true);
     const pathname = parsedUrl.pathname;
 
@@ -101,7 +185,8 @@ const server = http.createServer((req, res) => {
         res.writeHead(200, {
             'Access-Control-Allow-Origin': '*',
             'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-            'Access-Control-Allow-Headers': 'Content-Type, Authorization'
+            'Access-Control-Allow-Headers': 'Content-Type, Authorization, Cookie',
+            'Access-Control-Allow-Credentials': 'true'
         });
         res.end();
         return;
@@ -110,7 +195,7 @@ const server = http.createServer((req, res) => {
     // API endpoint: GET /api/tasks
     if (pathname === '/api/tasks' && req.method === 'GET') {
         // Check authentication
-        const authInfo = getAuthInfo(req);
+        const authInfo = await getAuthInfo(req);
         if (!authInfo.authenticated) {
             sendError(res, 401, 'Unauthorized: Invalid or missing authentication token');
             return;
@@ -141,7 +226,7 @@ const server = http.createServer((req, res) => {
     // API endpoint: GET /api/projects
     if (pathname === '/api/projects' && req.method === 'GET') {
         // Check authentication
-        const authInfo = getAuthInfo(req);
+        const authInfo = await getAuthInfo(req);
         if (!authInfo.authenticated) {
             sendError(res, 401, 'Unauthorized: Invalid or missing authentication token');
             return;
@@ -172,7 +257,7 @@ const server = http.createServer((req, res) => {
     // API endpoint: POST /api/tasks
     if (pathname === '/api/tasks' && req.method === 'POST') {
         // Check authentication
-        const authInfo = getAuthInfo(req);
+        const authInfo = await getAuthInfo(req);
         if (!authInfo.authenticated) {
             sendError(res, 401, 'Unauthorized: Invalid or missing authentication token');
             return;
@@ -266,7 +351,7 @@ const server = http.createServer((req, res) => {
     // API endpoint: PUT /api/tasks/:taskId
     if (pathname.startsWith('/api/tasks/') && req.method === 'PUT') {
         // Check authentication
-        const authInfo = getAuthInfo(req);
+        const authInfo = await getAuthInfo(req);
         if (!authInfo.authenticated) {
             sendError(res, 401, 'Unauthorized: Invalid or missing authentication token');
             return;
@@ -373,7 +458,7 @@ const server = http.createServer((req, res) => {
     // API endpoint: POST /api/test/reset (test account only)
     if (pathname === '/api/test/reset' && req.method === 'POST') {
         // Check authentication - must be test account
-        const authInfo = getAuthInfo(req);
+        const authInfo = await getAuthInfo(req);
         if (!authInfo.authenticated || !authInfo.isTestAccount) {
             sendError(res, 403, 'Forbidden: This endpoint is only available for test accounts');
             return;
@@ -455,7 +540,7 @@ const server = http.createServer((req, res) => {
     // API endpoint: POST /api/ralph/execute
     if (pathname === '/api/ralph/execute' && req.method === 'POST') {
         // Check authentication
-        if (!isAuthenticated(req)) {
+        if (!(await isAuthenticated(req))) {
             sendError(res, 401, 'Unauthorized: Invalid or missing authentication token');
             return;
         }
@@ -541,7 +626,7 @@ const server = http.createServer((req, res) => {
     // API endpoint: GET /api/ralph/status
     if (pathname === '/api/ralph/status' && req.method === 'GET') {
         // Check authentication
-        if (!isAuthenticated(req)) {
+        if (!(await isAuthenticated(req))) {
             sendError(res, 401, 'Unauthorized: Invalid or missing authentication token');
             return;
         }
@@ -557,7 +642,7 @@ const server = http.createServer((req, res) => {
     // API endpoint: GET /api/ralph/current-log
     if (pathname === '/api/ralph/current-log' && req.method === 'GET') {
         // Check authentication
-        if (!isAuthenticated(req)) {
+        if (!(await isAuthenticated(req))) {
             sendError(res, 401, 'Unauthorized: Invalid or missing authentication token');
             return;
         }
@@ -609,7 +694,7 @@ const server = http.createServer((req, res) => {
     // API endpoint: GET /api/ralph/log-history
     if (pathname === '/api/ralph/log-history' && req.method === 'GET') {
         // Check authentication
-        if (!isAuthenticated(req)) {
+        if (!(await isAuthenticated(req))) {
             sendError(res, 401, 'Unauthorized: Invalid or missing authentication token');
             return;
         }
@@ -646,7 +731,7 @@ const server = http.createServer((req, res) => {
     // API endpoint: GET /api/ralph/log/:filename
     if (pathname.startsWith('/api/ralph/log/') && req.method === 'GET') {
         // Check authentication
-        if (!isAuthenticated(req)) {
+        if (!(await isAuthenticated(req))) {
             sendError(res, 401, 'Unauthorized: Invalid or missing authentication token');
             return;
         }
@@ -681,7 +766,7 @@ const server = http.createServer((req, res) => {
     // API endpoint: GET /api/ralph/logs
     if (pathname === '/api/ralph/logs' && req.method === 'GET') {
         // Check authentication
-        if (!isAuthenticated(req)) {
+        if (!(await isAuthenticated(req))) {
             sendError(res, 401, 'Unauthorized: Invalid or missing authentication token');
             return;
         }
@@ -776,7 +861,7 @@ const server = http.createServer((req, res) => {
     // API endpoint: GET /api/ralph/auto-status
     if (pathname === '/api/ralph/auto-status' && req.method === 'GET') {
         // Check authentication
-        if (!isAuthenticated(req)) {
+        if (!(await isAuthenticated(req))) {
             sendError(res, 401, 'Unauthorized: Invalid or missing authentication token');
             return;
         }
@@ -829,7 +914,7 @@ const server = http.createServer((req, res) => {
     // API endpoint: GET /api/ralph/auto-logs
     if (pathname === '/api/ralph/auto-logs' && req.method === 'GET') {
         // Check authentication
-        if (!isAuthenticated(req)) {
+        if (!(await isAuthenticated(req))) {
             sendError(res, 401, 'Unauthorized: Invalid or missing authentication token');
             return;
         }
@@ -880,7 +965,7 @@ const server = http.createServer((req, res) => {
     // API endpoint: POST /api/ralph/auto/start
     if (pathname === '/api/ralph/auto/start' && req.method === 'POST') {
         // Check authentication
-        if (!isAuthenticated(req)) {
+        if (!(await isAuthenticated(req))) {
             sendError(res, 401, 'Unauthorized: Invalid or missing authentication token');
             return;
         }
@@ -905,7 +990,7 @@ const server = http.createServer((req, res) => {
     // API endpoint: POST /api/ralph/auto/stop
     if (pathname === '/api/ralph/auto/stop' && req.method === 'POST') {
         // Check authentication
-        if (!isAuthenticated(req)) {
+        if (!(await isAuthenticated(req))) {
             sendError(res, 401, 'Unauthorized: Invalid or missing authentication token');
             return;
         }

@@ -2,21 +2,23 @@
 const API_URL = '/api/tasks';
 const RALPH_API_URL = '/api/ralph';
 
+// Build request headers (use Bearer token for tests, otherwise rely on cookies)
+function buildHeaders() {
+    const token = getAuthToken();
+    const headers = { 'Content-Type': 'application/json' };
+    if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+    }
+    return headers;
+}
+
 // Update task (mark as complete)
 async function updateTask(taskId, updateData) {
-    const token = getAuthToken();
-    if (!token) {
-        console.error('No authentication token available');
-        return { success: false, error: 'Not authenticated' };
-    }
-
     try {
         const response = await fetch(`${API_URL}/${taskId}`, {
             method: 'PUT',
-            headers: {
-                'Authorization': `Bearer ${token}`,
-                'Content-Type': 'application/json'
-            },
+            headers: buildHeaders(),
+            credentials: 'include',
             body: JSON.stringify(updateData)
         });
 
@@ -91,19 +93,11 @@ function showMessage(text, type) {
 
 // Fetch tasks from API
 async function fetchTasks() {
-    const token = getAuthToken();
-    if (!token) {
-        console.error('No authentication token available');
-        return null;
-    }
-
     try {
         const response = await fetch(API_URL, {
             method: 'GET',
-            headers: {
-                'Authorization': `Bearer ${token}`,
-                'Content-Type': 'application/json'
-            }
+            headers: buildHeaders(),
+            credentials: 'include'
         });
 
         if (!response.ok) {
@@ -419,13 +413,6 @@ async function initializePage() {
 
 // Ralph execution functions
 async function executeRalph() {
-    const token = getAuthToken();
-    if (!token) {
-        console.error('No authentication token available');
-        showMessage('Not authenticated', 'error');
-        return;
-    }
-
     // Confirm action
     const confirmed = confirm('Start Ralph execution?\n\nRalph will work on the most important task automatically.\n\nThis may take several minutes.');
     if (!confirmed) {
@@ -438,10 +425,8 @@ async function executeRalph() {
     try {
         const response = await fetch(`${RALPH_API_URL}/execute`, {
             method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${token}`,
-                'Content-Type': 'application/json'
-            }
+            headers: buildHeaders(),
+            credentials: 'include'
         });
 
         if (!response.ok) {
@@ -463,18 +448,11 @@ async function executeRalph() {
 }
 
 async function checkRalphStatus() {
-    const token = getAuthToken();
-    if (!token) {
-        return null;
-    }
-
     try {
         const response = await fetch(`${RALPH_API_URL}/status`, {
             method: 'GET',
-            headers: {
-                'Authorization': `Bearer ${token}`,
-                'Content-Type': 'application/json'
-            }
+            headers: buildHeaders(),
+            credentials: 'include'
         });
 
         if (!response.ok) {
@@ -546,16 +524,13 @@ async function checkInitialRalphStatus() {
 
 // Auto-run status functions
 let autoStatusInterval = null;
+const API_BASE = '/api';
 
 async function fetchAutoStatus() {
-    const token = sessionStorage.getItem('authToken');
-    if (!token) return null;
-
     try {
         const response = await fetch(`${API_BASE}/ralph/auto-status`, {
-            headers: {
-                'Authorization': `Bearer ${token}`
-            }
+            headers: buildHeaders(),
+            credentials: 'include'
         });
 
         if (!response.ok) {
@@ -665,9 +640,6 @@ function startAutoStatusPolling() {
 }
 
 async function toggleWatcher() {
-    const token = sessionStorage.getItem('authToken');
-    if (!token) return;
-
     const watcherStatusEl = document.getElementById('watcherStatus');
     const isActive = watcherStatusEl && watcherStatusEl.classList.contains('active');
 
@@ -677,9 +649,8 @@ async function toggleWatcher() {
     try {
         const response = await fetch(`${API_BASE}${endpoint}`, {
             method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${token}`
-            }
+            headers: buildHeaders(),
+            credentials: 'include'
         });
 
         if (!response.ok) {
