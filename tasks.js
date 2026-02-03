@@ -239,6 +239,41 @@ function renderOpenTasks(tasks) {
     taskList.innerHTML = html;
 }
 
+// Extract task number from ID (e.g., "task-042" -> 42)
+function getTaskNumber(taskId) {
+    const match = taskId.match(/(\d+)$/);
+    return match ? parseInt(match[1], 10) : 0;
+}
+
+// Get unique projects from tasks
+function getUniqueProjects(tasks) {
+    const projects = new Set();
+    tasks.forEach(task => projects.add(task.project));
+    return Array.from(projects).sort();
+}
+
+// Current project filter for completed tasks
+let completedProjectFilter = 'all';
+
+// Set project filter for completed tasks
+function setCompletedProjectFilter(project) {
+    completedProjectFilter = project;
+
+    // Update active state on filter buttons
+    document.querySelectorAll('.project-filter-btn').forEach(btn => {
+        if (btn.dataset.project === project) {
+            btn.classList.add('active');
+        } else {
+            btn.classList.remove('active');
+        }
+    });
+
+    // Re-render completed tasks with new filter
+    if (allTasks) {
+        renderCompletedTasks(allTasks);
+    }
+}
+
 // Render completed tasks
 function renderCompletedTasks(tasks) {
     const taskList = document.getElementById('taskList');
@@ -249,78 +284,100 @@ function renderCompletedTasks(tasks) {
     }
 
     // Filter for completed tasks (completed = true)
-    const completedTasks = tasks.filter(task => task.completed);
+    let completedTasks = tasks.filter(task => task.completed);
 
     if (completedTasks.length === 0) {
         taskList.innerHTML = '<p class="no-tasks">No completed tasks yet.</p>';
         return;
     }
 
-    // Group by project
-    const grouped = groupTasksByProject(completedTasks);
+    // Get unique projects for filter buttons
+    const projects = getUniqueProjects(completedTasks);
+
+    // Sort by task ID (latest/highest first)
+    completedTasks.sort((a, b) => getTaskNumber(b.id) - getTaskNumber(a.id));
+
+    // Apply project filter if set
+    if (completedProjectFilter !== 'all') {
+        completedTasks = completedTasks.filter(task => task.project === completedProjectFilter);
+    }
 
     let html = '';
 
-    Object.keys(grouped).sort().forEach(projectName => {
-        const projectTasks = grouped[projectName];
+    // Project filter controls
+    html += `
+        <div class="project-filter-controls">
+            <span class="filter-label">Filter by project:</span>
+            <div class="project-filter-buttons">
+                <button class="project-filter-btn ${completedProjectFilter === 'all' ? 'active' : ''}"
+                        data-project="all"
+                        onclick="setCompletedProjectFilter('all')">All</button>
+    `;
 
+    projects.forEach(project => {
+        const isActive = completedProjectFilter === project ? 'active' : '';
         html += `
-            <div class="project-group">
-                <h3 class="project-title">${projectName}</h3>
-                <div class="project-tasks">
+                <button class="project-filter-btn ${isActive}"
+                        data-project="${project}"
+                        onclick="setCompletedProjectFilter('${project}')">${project}</button>
+        `;
+    });
+
+    html += `
+            </div>
+        </div>
+    `;
+
+    // Task cards (no grouping)
+    html += '<div class="completed-tasks-list">';
+
+    completedTasks.forEach(task => {
+        html += `
+            <div class="task-card completed-task">
+                <div class="task-header">
+                    <div class="task-title-row">
+                        <span class="task-id">${task.id}</span>
+                        <h4 class="task-title">${task.title}</h4>
+                    </div>
+                    <span class="task-status status-completed">Completed</span>
+                </div>
+
+                <div class="task-meta-info">
+                    <span class="meta-item">Created: ${task.created}</span>
+                    <span class="meta-item project-badge">${task.project}</span>
+                </div>
+
+                <div class="task-requirements">
+                    <div class="requirements-header">
+                        <strong>Requirements:</strong>
+                        <button class="toggle-btn" id="toggle-${task.id}" onclick="toggleRequirements('${task.id}')">▶</button>
+                    </div>
+                    <ul class="requirements-list hidden" id="req-${task.id}">
         `;
 
-        projectTasks.forEach(task => {
-            html += `
-                <div class="task-card completed-task">
-                    <div class="task-header">
-                        <div class="task-title-row">
-                            <span class="task-id">${task.id}</span>
-                            <h4 class="task-title">${task.title}</h4>
-                        </div>
-                        <span class="task-status status-completed">Completed</span>
-                    </div>
-
-                    <div class="task-meta-info">
-                        <span class="meta-item">Created: ${task.created}</span>
-                        <span class="meta-item">Project: ${task.project}</span>
-                    </div>
-
-                    <div class="task-requirements">
-                        <div class="requirements-header">
-                            <strong>Requirements:</strong>
-                            <button class="toggle-btn" id="toggle-${task.id}" onclick="toggleRequirements('${task.id}')">▶</button>
-                        </div>
-                        <ul class="requirements-list hidden" id="req-${task.id}">
-            `;
-
-            task.requirements.forEach(req => {
-                html += `<li>${req}</li>`;
-            });
-
-            html += `
-                        </ul>
-                    </div>
-            `;
-
-            if (task.notes && task.notes.trim() !== '') {
-                html += `
-                    <div class="task-notes">
-                        <strong>Notes:</strong> ${task.notes}
-                    </div>
-                `;
-            }
-
-            html += `
-                </div>
-            `;
+        task.requirements.forEach(req => {
+            html += `<li>${req}</li>`;
         });
 
         html += `
+                    </ul>
                 </div>
+        `;
+
+        if (task.notes && task.notes.trim() !== '') {
+            html += `
+                <div class="task-notes">
+                    <strong>Notes:</strong> ${task.notes}
+                </div>
+            `;
+        }
+
+        html += `
             </div>
         `;
     });
+
+    html += '</div>';
 
     taskList.innerHTML = html;
 }
