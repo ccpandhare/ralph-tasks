@@ -308,11 +308,27 @@ const server = http.createServer((req, res) => {
 
                         // Update task fields
                         const task = tasksData.tasks[taskIndex];
+
+                        // Update status and completed (original fields)
                         if (typeof updateData.status === 'boolean') {
                             task.status = updateData.status;
                         }
                         if (typeof updateData.completed === 'boolean') {
                             task.completed = updateData.completed;
+                        }
+
+                        // Update other editable fields
+                        if (updateData.project && typeof updateData.project === 'string') {
+                            task.project = updateData.project;
+                        }
+                        if (updateData.title && typeof updateData.title === 'string') {
+                            task.title = updateData.title;
+                        }
+                        if (updateData.requirements && Array.isArray(updateData.requirements)) {
+                            task.requirements = updateData.requirements;
+                        }
+                        if (updateData.notes !== undefined) {
+                            task.notes = updateData.notes;
                         }
 
                         // Write atomically using temporary file
@@ -752,6 +768,160 @@ const server = http.createServer((req, res) => {
                 offset: offset,
                 hasMore: hasMore,
                 returnedEntries: paginatedSections.length
+            });
+        });
+        return;
+    }
+
+    // API endpoint: GET /api/ralph/auto-status
+    if (pathname === '/api/ralph/auto-status' && req.method === 'GET') {
+        // Check authentication
+        if (!isAuthenticated(req)) {
+            sendError(res, 401, 'Unauthorized: Invalid or missing authentication token');
+            return;
+        }
+
+        // Check file watcher systemd service status
+        const { exec } = require('child_process');
+        exec('systemctl is-active ralph-watcher.service', (err, stdout, stderr) => {
+            const watcherRunning = stdout.trim() === 'active';
+
+            // Check if lock file exists (Ralph currently executing)
+            const lockFileExists = fs.existsSync('/var/main/ralph.lock');
+            let currentPid = null;
+            if (lockFileExists && fs.existsSync('/var/main/ralph.pid')) {
+                try {
+                    currentPid = fs.readFileSync('/var/main/ralph.pid', 'utf-8').trim();
+                } catch (e) {
+                    // Ignore error
+                }
+            }
+
+            // Get last run time from auto-run.log
+            let lastRunTime = null;
+            const autoRunLog = '/var/main/logs/auto-run.log';
+            if (fs.existsSync(autoRunLog)) {
+                try {
+                    const logContent = fs.readFileSync(autoRunLog, 'utf-8');
+                    const lines = logContent.split('\n').filter(l => l.includes('Starting Ralph'));
+                    if (lines.length > 0) {
+                        const lastLine = lines[lines.length - 1];
+                        const match = lastLine.match(/\[(.+?)\]/);
+                        if (match) {
+                            lastRunTime = match[1];
+                        }
+                    }
+                } catch (e) {
+                    // Ignore error
+                }
+            }
+
+            sendJSON(res, 200, {
+                watcherRunning: watcherRunning,
+                ralphExecuting: lockFileExists,
+                currentPid: currentPid,
+                lastRunTime: lastRunTime
+            });
+        });
+        return;
+    }
+
+    // API endpoint: GET /api/ralph/auto-logs
+    if (pathname === '/api/ralph/auto-logs' && req.method === 'GET') {
+        // Check authentication
+        if (!isAuthenticated(req)) {
+            sendError(res, 401, 'Unauthorized: Invalid or missing authentication token');
+            return;
+        }
+
+        const logType = parsedUrl.query.type || 'auto-run'; // auto-run, watcher, cron
+        const limit = parseInt(parsedUrl.query.limit) || 100; // Last N lines
+
+        const logFiles = {
+            'auto-run': '/var/main/logs/auto-run.log',
+            'watcher': '/var/main/logs/watcher.log',
+            'cron': '/var/main/logs/cron.log'
+        };
+
+        const logFile = logFiles[logType];
+        if (!logFile) {
+            sendError(res, 400, 'Invalid log type. Must be: auto-run, watcher, or cron');
+            return;
+        }
+
+        if (!fs.existsSync(logFile)) {
+            sendJSON(res, 200, {
+                content: '',
+                type: logType,
+                exists: false,
+                message: `No ${logType} logs available yet`
+            });
+            return;
+        }
+
+        try {
+            const content = fs.readFileSync(logFile, 'utf-8');
+            const lines = content.split('\n');
+            const lastLines = lines.slice(-limit).join('\n');
+
+            sendJSON(res, 200, {
+                content: lastLines,
+                type: logType,
+                exists: true,
+                totalLines: lines.length,
+                returnedLines: Math.min(limit, lines.length)
+            });
+        } catch (err) {
+            sendError(res, 500, `Failed to read ${logType} log: ${err.message}`);
+        }
+        return;
+    }
+
+    // API endpoint: POST /api/ralph/auto/start
+    if (pathname === '/api/ralph/auto/start' && req.method === 'POST') {
+        // Check authentication
+        if (!isAuthenticated(req)) {
+            sendError(res, 401, 'Unauthorized: Invalid or missing authentication token');
+            return;
+        }
+
+        const { exec } = require('child_process');
+        exec('systemctl start ralph-watcher.service', (err, stdout, stderr) => {
+            if (err) {
+                sendError(res, 500, `Failed to start watcher: ${stderr || err.message}`);
+                return;
+            }
+
+            sendJSON(res, 200, {
+                success: true,
+                message: 'File watcher service started',
+                stdout: stdout,
+                stderr: stderr
+            });
+        });
+        return;
+    }
+
+    // API endpoint: POST /api/ralph/auto/stop
+    if (pathname === '/api/ralph/auto/stop' && req.method === 'POST') {
+        // Check authentication
+        if (!isAuthenticated(req)) {
+            sendError(res, 401, 'Unauthorized: Invalid or missing authentication token');
+            return;
+        }
+
+        const { exec } = require('child_process');
+        exec('systemctl stop ralph-watcher.service', (err, stdout, stderr) => {
+            if (err) {
+                sendError(res, 500, `Failed to stop watcher: ${stderr || err.message}`);
+                return;
+            }
+
+            sendJSON(res, 200, {
+                success: true,
+                message: 'File watcher service stopped',
+                stdout: stdout,
+                stderr: stderr
             });
         });
         return;

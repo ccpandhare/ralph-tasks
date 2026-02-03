@@ -554,6 +554,31 @@ main {
     transform: translateY(0);
 }
 
+.btn-edit {
+    padding: 0.75rem 1.5rem;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border: none;
+    border-radius: 10px;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+    min-height: 48px;
+}
+
+.btn-edit:hover {
+    background: linear-gradient(135deg, #5568d3 0%, #6a4091 100%);
+    box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+    transform: translateY(-2px);
+}
+
+.btn-edit:active {
+    background: linear-gradient(135deg, #4a5bc4 0%, #5a367f 100%);
+    transform: translateY(0);
+}
+
 /* Task form styles */
 .task-form {
     max-width: 800px;
@@ -790,7 +815,8 @@ main {
         flex-direction: column;
     }
 
-    .task-actions .btn-complete {
+    .task-actions .btn-complete,
+    .task-actions .btn-edit {
         width: 100%;
     }
 }

@@ -219,6 +219,9 @@ function renderOpenTasks(tasks) {
                         <span>Created: ${task.created}</span>
                     </div>
                     <div class="task-actions">
+                        <button class="btn-edit" onclick="window.location.href='edit-task.html?id=${task.id}'">
+                            Edit Task
+                        </button>
                         <button class="btn-complete" onclick="markTaskComplete('${task.id}', '${task.title.replace(/'/g, "\\'")}')">
                             Mark as Complete
                         </button>

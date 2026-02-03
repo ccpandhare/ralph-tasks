@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Ralph Auto-Run Logs - View automation logs">
+    <meta name="author" content="Chinmay Pandhare">
+    <title>Ralph Auto-Run Logs</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <header>
+        <div class="container header-content">
+            <h1>🤖 Ralph Auto-Run Logs</h1>
+            <div class="header-actions">
+                <a href="index.html" class="btn btn-secondary">← Back to Tasks</a>
+                <button id="logoutBtn" class="btn btn-secondary" onclick="logout()">Logout</button>
+            </div>
+        </div>
+    </header>
+
+    <main class="container">
+        <div class="content-area">
+            <!-- Status Overview -->
+            <div class="auto-run-overview">
+                <div class="overview-item">
+                    <div class="overview-label">File Watcher</div>
+                    <div id="watcherStatusOverview" class="overview-value">...</div>
+                    <button id="watcherToggleBtnOverview" class="btn btn-sm" onclick="toggleWatcher()">Toggle</button>
+                </div>
+                <div class="overview-item">
+                    <div class="overview-label">Ralph Status</div>
+                    <div id="executingStatusOverview" class="overview-value">...</div>
+                </div>
+                <div class="overview-item">
+                    <div class="overview-label">Last Auto-Run</div>
+                    <div id="lastRunTimeOverview" class="overview-value">...</div>
+                </div>
+            </div>
+
+            <!-- Log Type Selector -->
+            <div class="log-controls">
+                <div class="log-type-selector">
+                    <button class="log-type-btn active" data-type="auto-run" onclick="selectLogType('auto-run')">All Auto-Runs</button>
+                    <button class="log-type-btn" data-type="watcher" onclick="selectLogType('watcher')">File Watcher</button>
+                    <button class="log-type-btn" data-type="cron" onclick="selectLogType('cron')">Cron Jobs</button>
+                </div>
+                <div class="log-actions">
+                    <label class="auto-refresh-toggle">
+                        <input type="checkbox" id="autoRefreshToggle" onchange="toggleAutoRefresh()">
+                        <span>Auto-refresh</span>
+                    </label>
+                    <button class="btn btn-secondary" onclick="refreshCurrentLog()">🔄 Refresh</button>
+                </div>
+            </div>
+
+            <!-- Log Viewer -->
+            <div class="log-viewer-container">
+                <div class="log-viewer-header">
+                    <h3 id="logTitle">Auto-Run Activity Log</h3>
+                    <div class="log-info">
+                        <span id="logInfo">Loading...</span>
+                    </div>
+                </div>
+                <pre id="logContent" class="log-content">Loading logs...</pre>
+            </div>
+        </div>
+    </main>
+
+    <script src="auth.js"></script>
+    <script src="ralph-auto.js"></script>
+</body>
+</html>
